@@ -2,7 +2,7 @@
 
 Dockerized High Accuracy Localization application based on Loc-NeRF paper and using Nerfacto model as the base NeRF model. 
 
-# Usage
+# Installation
 1) Navigate to the folder directory:
 
        cd hal-nerf 
@@ -27,7 +27,8 @@ Dockerized High Accuracy Localization application based on Loc-NeRF paper and us
 
        ./run.bash --container-name <your_container_name> --cfg-dir $PWD/workspace/cfg_experiment --image-name <your_image_name> --poses-dir $PWD/workspace/colmap_output --ckpt $PWD/workspace/weight.ckpt
 
-7) Now that you have created the container, you can run the experiment by running this command:
+# Usage
+Now that you have created the container, you can run the experiment by running this command:
 
        roslaunch locnerf navigate.launch parameter_file:=<param_file.yaml>
 
@@ -41,10 +42,10 @@ Dockerized High Accuracy Localization application based on Loc-NeRF paper and us
   7) particles_random_initial_rotation    # initialization of particles' rotation
   8) image_idx    # the ground truth image. We trying to find the pose of the camera when this image was taken. It is used only for visualization purposes in order to compare it with the predicted result.
 
-8) If you want to visualize the experiment, you can activate rviz vizualization. In other terminal, access the running container with this command:
+If you want to visualize the experiment, you can activate rviz vizualization. In other terminal, access the running container with this command:
 
        docker exec -it your_container_name /bin/bash
 
-9) Once you are inside the container, run:
+Once you are inside the container, run:
 
        rviz -d $(rospack find locnerf)/rviz/rviz.rviz 
