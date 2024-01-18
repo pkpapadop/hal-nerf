@@ -25,8 +25,7 @@ Dockerized High Accuracy Localization application based on Loc-NeRF paper and us
 
 6) Run bash script (5 arguments):
 
-       ./run.bash --container-name <your_container_name> --cfg-dir $PWD/workspace/cfg_experiment --image-name <your_image
-       _name> --poses-dir $PWD/workspace/colmap_output --ckpt $PWD/workspace/weight.ckpt
+       ./run.bash --container-name <your_container_name> --cfg-dir $PWD/workspace/cfg_experiment --image-name <your_image_name> --poses-dir $PWD/workspace/colmap_output --ckpt $PWD/workspace/weight.ckpt
 
 7) Now that you have created the container, you can run the experiment by running this command:
 
