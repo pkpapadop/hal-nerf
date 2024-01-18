@@ -32,7 +32,7 @@ Now that you have created the container, you can run the experiment by running t
 
        roslaunch locnerf navigate.launch parameter_file:=<param_file.yaml>
 
-- Replace <param_file.yaml> with "global.yaml" inside the cfg_experiment folder. The configuration files are the same with the locnerf pipeline except the first eight args. Specifically, we added the following parameters:   
+Replace <param_file.yaml> with "global.yaml" inside the cfg_experiment folder. The configuration files are the same with the locnerf pipeline except the first eight args. Specifically, we added the following parameters:   
   1) position_error_threshold
   2) rotation_error_threshold 
   3) termination_mode    #  0: use position_error_threshold, 1: use rotation_error_threshold, 2: use position_error_threshold and rotation_error_threshold
