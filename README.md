@@ -31,7 +31,7 @@ Dockerized High Accuracy Localization application based on Loc-NeRF paper and us
 
        roslaunch locnerf navigate.launch parameter_file:=<param_file.yaml>
 
-- Replace <param_file.yaml> with "llff_global.yaml" inside the cfg_experiment folder. The configuration files are the same with the locnerf pipeline except the first eight args. Specifically, we added the following parameters:   
+- Replace <param_file.yaml> with "global.yaml" inside the cfg_experiment folder. The configuration files are the same with the locnerf pipeline except the first eight args. Specifically, we added the following parameters:   
   1) position_error_threshold
   2) rotation_error_threshold 
   3) termination_mode    #  0: use position_error_threshold, 1: use rotation_error_threshold, 2: use position_error_threshold and rotation_error_threshold
@@ -47,4 +47,4 @@ Dockerized High Accuracy Localization application based on Loc-NeRF paper and us
 
 9) Once you are inside the container, run:
 
-        rviz -d $(rospack find locnerf)/rviz/rviz.rviz 
+       rviz -d $(rospack find locnerf)/rviz/rviz.rviz 

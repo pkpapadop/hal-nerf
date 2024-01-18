@@ -1,19 +1,19 @@
-  #### termination criteria ####
+#### termination criteria ####
 position_error_threshold: 0.05
-rotation_error_threshold: 2
+rotation_error_threshold: 5
 termination_mode: 0 # 0: use position_error_threshold, 1: use rotation_error_threshold, 2: use position_error_threshold and rotation_error_threshold
-output_path: /home/iw
+output_path: /home/IW
 export_images: True # exported images will be stored in <output_path>/images folder
 
-#### particles initialization parametrs ####
+#### particles initialization parameters ####
 particles_random_initial_position: 1
 particles_random_initial_rotation: 180
-image_idx : 40
+image_idx : 4
 
 #### filtering flags ####
 run_predicts: False # Use odometry for predict step, otherwise use 0 mean gaussian noise.
 use_received_image: False # Update the sensor image.
-center_about_true_pose: False # Use gt orientation as the mean pose to generate an initial start pose - if False use origin.
+center_about_true_pose: True # Use gt orientation as the mean pose to generate an initial start pose - if False use origin.
 use_weighted_avg: True # Use weighted average to computer position estimate, otherwise use simple average.
 no_ndc: False # note that custom data cannot use ndc but LLFF should
 
@@ -24,7 +24,7 @@ fine_samples: 64 # number fine samples per ray
 photometric_loss: rgb # rgb
 sampling_strategy: random # only random is supported right now
 batch_size: 36 # number of pixels to use for measurement points
-num_particles: 300 # Number of initial particles.
+num_particles: 600 # Number of initial particles.
 
 #### dataset and weight loading ####
 dataset_type: llff # llff, custom
