@@ -9,7 +9,7 @@ Dockerized High Accuracy Localization application based on Loc-NeRF paper and us
 
 2) Compose the image with this command:
 
-       docker build -t <your_image_name> .
+       docker build --no-cache -t <your_image_name> .
 
 3) Rename your colmap output file as "colmap_output" and move it inside the following directory:
 
