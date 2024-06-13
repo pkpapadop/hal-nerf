@@ -82,10 +82,10 @@ rviz -d $(rospack find locnerf)/rviz/rviz.rviz
 
 ## Requirements
 Tested on a system with:
-- NVIDIA Geforce RTX 3060
-- 12th Gen Intel® Core™ i7-12700F
-- Memory 32 GB
-- OS: Ubuntu 22.04.3 LTS
+- GPU: NVIDIA Geforce RTX 3060
+- CPU: 12th Gen Intel® Core™ i7-12700F
+- RAM: Memory 32 GB
+- OS:  Ubuntu 22.04.3 LTS
 
 # License
 This project is licensed under the [MIT License]().
