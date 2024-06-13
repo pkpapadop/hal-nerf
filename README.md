@@ -37,7 +37,7 @@ chmod +x run.bash
 ./run.bash --container-name <your_container_name> --cfg-dir $PWD/workspace/cfg_experiment --image-name <your_image_name> --poses-dir $PWD/workspace/colmap_output --ckpt $PWD/workspace/weight.ckpt
 ```
 
-6) PART A. Now you are inside the container. First, prepare the dataset for DFNet training:
+6) Now you are inside the container. First, prepare the dataset for DFNet training:
 
 ```bash
 python colmap_to_mega_nerf.py --model_path /root/colmap_output/colmap --images_path /root/colmap_output/images --output_path /root/outputiw
@@ -52,7 +52,7 @@ python run_posenet.py --config config_dfnet.txt
 with config_dfnet.txt you can control some of the network training parameters
 
 
-8) PART B. Now, you can run HAL-NeRF by running this command:
+8) Now, you can run HAL-NeRF by running this command:
 
 ```bash
 roslaunch locnerf navigate.launch parameter_file:=<param_file.yaml>
