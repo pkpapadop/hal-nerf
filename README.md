@@ -1,51 +1,89 @@
-# HAL-NeRF
+# HAL-NeRF v2.0
 
-Dockerized High Accuracy Localization application based on Loc-NeRF paper and using Nerfacto model as the base NeRF model. 
+Dockerized High Accuracy Localization application based on Loc-NeRF paper and using Nerfacto model as the base NeRF model. This pipeline contains two parts:  
+ * Training the Df-Net pose regressor
+ * Optimizing the prediction of the pose regressor with Loc-Nerf  
 
-# Installation
-1) Navigate to the folder directory:
+## Usage 
 
-       cd hal-nerf 
+1) Rename your colmap output file as "colmap_output" and move it inside the following directory:
 
-2) Compose the image with this command:
+```bash
+../hal_nerf/workspace
+```
 
-       docker build --no-cache -t <your_image_name> .
+2) Rename your .ckpt file (pretrained nerfacto model) as "weight.ckpt" and move it inside the following directory:
 
-3) Rename your colmap output file as "colmap_output" and move it inside the following directory:
+```bash
+../hal_nerf/workspace
+```
 
-       workspace
+3) Compose the image with this command:
 
-4) Rename your .ckpt file (pretrained nerfacto model) as "weight.ckpt" and move it inside the following directory:
+```bash
+docker build -t your_image_name .
+```
 
-       workspace
+4) Change bash file permission with this command:
 
-5) Change bash file permission with this command:
+```bash
+chmod +x run.bash
+```
+5) Run bash script (5 arguments):
 
-       chmod +x run.bash
+```bash
+./run.bash --container-name <your_container_name> --cfg-dir $PWD/workspace/cfg_experiment --image-name <your_image_name> --poses-dir $PWD/workspace/colmap_output --ckpt $PWD/workspace/weight.ckpt
+```
 
-6) Run bash script (5 arguments):
+6) PART A. Now you are inside the container. First, prepare the dataset for DFNET training:
 
-       ./run.bash --container-name <your_container_name> --cfg-dir $PWD/workspace/cfg_experiment --image-name <your_image_name> --poses-dir $PWD/workspace/colmap_output --ckpt $PWD/workspace/weight.ckpt
+```bash
+python colmap_to_mega_nerf.py --model_path /root/colmap_output/colmap --images_path /root/colmap_output/images --output_path /root/outputiw
+```
 
-# Usage
-Now that you have created the container, you can run the experiment by running this command:
+7) Second, train DFNET: 
 
-       roslaunch locnerf navigate.launch parameter_file:=<param_file.yaml>
+```bash
+python run_posenet.py --config config_dfnet.txt
+```
 
-Replace <param_file.yaml> with "global.yaml" inside the cfg_experiment folder. The configuration files are the same with the locnerf pipeline except the first eight args. Specifically, we added the following parameters:   
+with config_dfnet.txt you can control some of the network training parameters
+
+
+8) PART B. Now, you can run HAL-NeRF by running this command:
+
+```bash
+roslaunch locnerf navigate.launch parameter_file:=<param_file.yaml>
+```
+
+- Replace <param_file.yaml> with "hal_nerf.yaml" inside the cfg_experiment folder. The configuration files are the same with the locnerf pipeline except the first eight args. Specifically, we added the following parameters:   
   1) position_error_threshold
   2) rotation_error_threshold 
   3) termination_mode    #  0: use position_error_threshold, 1: use rotation_error_threshold, 2: use position_error_threshold and rotation_error_threshold
   4) output_path    # the path in which the results will be saved inside the container.
-  5) export_images    # if is true, the experinment results contain also visual information.
-  6) particles_random_initial_position    # initalization of particles' position
-  7) particles_random_initial_rotation    # initialization of particles' rotation
-  8) image_idx    # the ground truth image. We trying to find the pose of the camera when this image was taken. It is used only for visualization purposes in order to compare it with the predicted result.
+  5) export_images    # If is true, the experinment results contain also visual information.
+  6) particles_random_initial_position around DFNET pose prediction    # initalization of particles' position
+  7) particles_random_initial_rotation around DFNET psoe prediction    # initialization of particles' rotation
+  8) image_idx    # the ground truth image. We trying to find the pose of the camera when this image was taken. It is used only for visualization purposes to compare it with the predicted result.
 
-If you want to visualize the experiment, you can activate rviz vizualization. In other terminal, access the running container with this command:
+9) If you want to visualize the experiment, you can activate rviz vizualization. In other terminal, access the running container with this command:
 
-       docker exec -it your_container_name /bin/bash
+```bash
+docker exec -it your_container_name /bin/bash
+```
 
-Once you are inside the container, run:
+10) Once you are inside the container, run:
 
-       rviz -d $(rospack find locnerf)/rviz/rviz.rviz 
+```bash
+rviz -d $(rospack find locnerf)/rviz/rviz.rviz 
+```
+
+## Requirements
+Tested on a computer with these specifications:
+- NVIDIA Geforce RTX 3060
+- 12th Gen Intel® Core™ i7-12700F × 20
+- Memory 32 GB
+- OS: Ubuntu 22.04.3 LTS
+
+# License
+This project is licensed under the [MIT License]().
