@@ -4,7 +4,7 @@ Dockerized High Accuracy Localization application based on Loc-NeRF (https://arx
 
 This pipeline contains two parts:  
  * Training the DFNet pose regressor (https://arxiv.org/abs/2204.00559)
- * Optimizing the prediction of the pose regressor with Loc-Nerf  
+ * Optimizing the prediction of the pose regressor with Loc-NeRF 
 
 ## Usage 
 
