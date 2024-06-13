@@ -17,6 +17,11 @@ from nerfacto_loader import load_model
 
 from scipy.spatial.transform import Rotation as R
 from nerfacto_loader import vizualize
+from nerfacto_loader_2 import load_and_predict_pose
+# from depth_anything.dpt import DepthAnything
+# from depth_anything.util.transform import Resize, NormalizeImage, PrepareForNet
+import torch.nn.functional as F
+from torchvision.transforms import Compose
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -66,10 +71,57 @@ class NeRF:
             #self.H, self.W, self.focal = self.hwf
             
             checkpoint_path = '/root/weight.ckpt'
-            transform_path = '/root/colmap_output/transforms.json'
-            self.obs_img, self.obs_img_pose, self.W, self.H = input_dataset(transform_path, self.obs_img_num, self.factor)
+            checkpoint_path_2 = '/root/catkin_ws/src/Loc-NeRF/src/pose_regressor/logs/checkpoint.pt'
+            transform_path = '/root/colmap_output'
+            self.obs_img, self.obs_img_pose, self.W, self.H, self.image_filename = input_dataset(transform_path, self.obs_img_num, self.factor)
+            print("The filename is :")
+            print(self.image_filename)
+            self.obs_img = torch.tensor(self.obs_img)
+            img_dfnet = self.obs_img.permute(2, 0, 1)  # Reorder to [c, h, w]
+            img_dfnet = img_dfnet.unsqueeze(0)
+            img_dfnet = img_dfnet.to('cuda')
+
+            # TODO : Depth Module
+
+            # transform = Compose([
+            #     Resize(
+            #         width=518,
+            #         height=518,
+            #         resize_target=False,
+            #         keep_aspect_ratio=True,
+            #         ensure_multiple_of=14,
+            #         resize_method='lower_bound',
+            #         image_interpolation_method=cv2.INTER_CUBIC,
+            #     ),
+            #     # NormalizeImage(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            #     # PrepareForNet(),
+            # ])
+            # print(self.obs_img.shape)
+            # image_depth = transform({'image': self.obs_img.numpy()})['image']
+            # image_depth = torch.from_numpy(image_depth).unsqueeze(0).to('cpu')
+            
+
+
+            #print(img_dfnet, img_dfnet.shape)
+            predict_pose = load_and_predict_pose(checkpoint_path_2, img_dfnet, transform_path, self.factor)
+            self.predicted_pose = predict_pose.cpu().numpy()
+            self.predicted_pose = np.vstack([self.predicted_pose, [0, 0, 0, 1]])
+            #print(self.predicted_pose[:3,3], self.obs_img_pose)
+
+
             self.obs_img_pose = self.obs_img_pose.cpu().numpy()
+            t = self.obs_img_pose[:3, 3]
+            #Extract the rotation matrix (R)    
+            Rot = self.obs_img_pose[:3, :3]
+            euler_angles = R.from_matrix(Rot).as_euler('xyz', degrees=True)
+    # Combine the translation and rotation into a single vector
+            self.pose_vector = np.concatenate((t, euler_angles))
             self.obs_img_pose = np.vstack([self.obs_img_pose, [0, 0, 0, 1]])
+
+
+
+            
+            
             # AR end
             
             if self.no_ndc:
@@ -106,8 +158,29 @@ class NeRF:
         self.model= load_model(transform_path, checkpoint_path, self.factor)
         self.a = get_params(transform_path, self.factor)
 
+        # TODO : Depth Module
+        # self.depth_anything = DepthAnything.from_pretrained('LiheYoung/depth_anything_{}14'.format('vitl')).to('cpu').eval()
+        # with torch.no_grad():
+        #         depth = self.depth_anything(image_depth)
+        # depth = F.interpolate(depth[None], (self.H, self.W), mode='bilinear', align_corners=False)[0, 0]
+        # self.depth = (depth - depth.min()) / (depth.max() - depth.min())
+        # print(depth)
+        # # depth = depth.cpu().numpy().astype(np.uint8)
+        # # depth = cv2.applyColorMap(depth, cv2.COLORMAP_INFERNO)
+
+        
+
+        # plt.imshow(depth, cmap='inferno')  # Use 'inferno' colormap for visualization
+        # plt.colorbar()  # To see the color scale
+        # plt.title('Normalized Depth Map')
+        # plt.axis('off')  # Hide axes ticks
+        # plt.show()
+
+      
+
         if nerf_params['export_images']: # TODO: add self.export_images to NeRF object
             vizualize(self.obs_img_pose[:3,:], self.model, self.a,0, nerf_params['output_path'])
+            #vizualize(self.predicted_pose[:3,:], self.model, self.a,1000, nerf_params['output_path'])
         # AR end
     
     def get_poi_interest_regions(self, show_img=False, sampling_type = None):
@@ -126,7 +199,15 @@ class NeRF:
 
     def get_loss(self, particles, batch, photometric_loss='rgb'):
         target_s = self.obs_img_noised[batch[:, 1], batch[:, 0]] # TODO check ordering here
+        # depth_s = self.depth[batch[:, 1], batch[:, 0]]
+        # depth_s = torch.Tensor(depth_s).to(device)
+        #print(depth_s.shape)
         target_s = torch.Tensor(target_s).to(device)
+        # print(target_s.shape)
+        # _, target_depth = get_loss(self.obs_img_pose, self.model,self.a, batch, self.batch_size)
+        # target_depth = torch.Tensor(target_depth).to(device)
+        # print(target_depth)
+
 
         start_time = time.time()
         # AR start
@@ -135,11 +216,17 @@ class NeRF:
             pose = torch.Tensor(particle).to(device)
 		
             nerf_time = time.time() - start_time
-            rgb = get_loss(pose, self.model, self.a, batch, self.batch_size)
-            rgb = torch.tensor(rgb)
+            rgb, _ = get_loss(pose, self.model, self.a, batch, self.batch_size)
+            rgb = torch.tensor(rgb).to(device)
+            # depth = torch.tensor(depth).to(device)
+            #print(depth)
     
             if photometric_loss == 'rgb':
-                loss = img2mse(rgb, target_s)
+                loss_rgb = img2mse(rgb, target_s)
+                # loss_depth = img2mse(depth, depth_s)
+                loss =loss_rgb 
+                #print(loss_depth)
+                
                 
             else:
                 # TODO throw an error

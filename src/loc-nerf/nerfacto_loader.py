@@ -23,6 +23,7 @@ from nerfstudio.configs.base_config import InstantiateConfig , PrintableConfig
 import copy
 from nerfstudio.cameras.rays import RayBundle
 from nerfstudio.data.dataparsers.nerfstudio_dataparser import NerfstudioDataParserConfig
+from nerfstudio.data.dataparsers.colmap_dataparser import ColmapDataParserConfig
 from pathlib import Path
 from nerfstudio.model_components.ray_generators import RayGenerator
 from nerfstudio.cameras.cameras import Cameras
@@ -33,6 +34,7 @@ import torch.nn.functional as F
 import cv2
 from nerfstudio.data.datasets.base_dataset import InputDataset
 import matplotlib.image as mpimg
+
 
 
 
@@ -78,7 +80,7 @@ import matplotlib.image as mpimg
 
 def load_model(transform_path, checkpoint_path, factor):
 
-  config = NerfstudioDataParserConfig(data = Path(transform_path) , downscale_factor = factor)
+  config = ColmapDataParserConfig(data = Path(transform_path) , downscale_factor = factor)
   dataparser = config.setup()
   dataparser_outputs = dataparser.get_dataparser_outputs(split="train")
   scene = dataparser_outputs.scene_box
@@ -90,7 +92,7 @@ def load_model(transform_path, checkpoint_path, factor):
 
   loaded_state = torch.load(root)
   loaded_state = loaded_state["pipeline"]
-  common_substring = "_model."
+  common_substring = "_model."  
 
 # Create a new dictionary with updated keys
   updated_dict = {k.replace(common_substring, ""): v for k, v in loaded_state.items()}
@@ -104,21 +106,22 @@ def load_model(transform_path, checkpoint_path, factor):
  
 def input_dataset(transform_path, index, factor):
   
-  config = NerfstudioDataParserConfig(data = Path(transform_path) , downscale_factor = factor )
+  config = ColmapDataParserConfig(data = Path(transform_path) , downscale_factor = factor)
   dataparser = config.setup()
-  dataparser_outputs = dataparser.get_dataparser_outputs(split="train")
+  dataparser_outputs = dataparser.get_dataparser_outputs(split="val")
   input_dataset = InputDataset(dataparser_outputs)
   ground_truth_pose = dataparser_outputs.cameras.camera_to_worlds[index,:,:]
   image = input_dataset.get_image(index)
+  image_filename = dataparser_outputs.image_filenames[index]
   width = dataparser_outputs.cameras.width[0][0]
   height = dataparser_outputs.cameras.height[0][0]
 
   
-  return image, ground_truth_pose, width, height
+  return image, ground_truth_pose, width, height, image_filename
   
   
 def get_params(transform_path, downscale_factor):
-  config = NerfstudioDataParserConfig(data = Path(transform_path) , downscale_factor = downscale_factor )
+  config = ColmapDataParserConfig(data = Path(transform_path) , downscale_factor = downscale_factor)
   dataparser = config.setup()
   dataparser_outputs = dataparser.get_dataparser_outputs(split="train")
   fx = dataparser_outputs.cameras.fx[0][0]
@@ -152,16 +155,19 @@ def get_loss(pose, model, a, batch, batchsize):
   batch = torch.tensor(batch)
   coords = torch.stack((batch[:,1], batch[:,0]), dim= -1 )
   camera_ray_bundle = camera.generate_rays(camera_indices = 0, coords=coords).to('cuda')
-  nears_value = 0.1
-  fars_value = 8
+  nears_value = 0.05
+  fars_value = 1000
   nears = torch.full((batchsize, 1), nears_value, dtype=torch.float32, device='cuda')
   fars = torch.full((batchsize, 1), fars_value, dtype=torch.float32, device='cuda')
   camera_ray_bundle.nears = nears
   camera_ray_bundle.fars = fars
   outputs = model.get_outputs(camera_ray_bundle)
   rgb = outputs["rgb"]
+  depth = outputs["expected_depth"]
+
+
   
-  return rgb
+  return rgb, depth
   
 def vizualize(pose, model, a, update_step, output_path):
   camera_to_world = torch.tensor(pose)
@@ -181,8 +187,8 @@ def vizualize(pose, model, a, update_step, output_path):
 # Concatenate x and y coordinates to form the final tensor
   coords = torch.cat((x_coords_flat, y_coords_flat), dim=-1)
   camera_ray_bundle = camera.generate_rays(camera_indices = 0, coords=coords).to('cuda')
-  nears_value = 0.1
-  fars_value = 8
+  nears_value = 0.05
+  fars_value = 1000
   batch_size = a['height']*a['width']  # Set your desired batch size
   nears = torch.full((batch_size, 1), nears_value, dtype=torch.float32, device='cuda')
   fars = torch.full((batch_size, 1), fars_value, dtype=torch.float32, device='cuda')

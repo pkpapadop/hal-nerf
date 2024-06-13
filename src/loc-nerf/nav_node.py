@@ -30,6 +30,8 @@ from particle_filter import ParticleFilter
 from utils import get_pose
 from navigator_base import NavigatorBase
 from nerfacto_loader import vizualize # AR
+from scipy.spatial.transform import Rotation as R
+import gtsam
 
 torch.set_default_tensor_type('torch.cuda.FloatTensor')
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -48,6 +50,7 @@ class Navigator(NavigatorBase):
         self.particle_pub = rospy.Publisher("/particles", PoseArray, queue_size = 10)
         self.pose_pub = rospy.Publisher("/estimated_pose", Odometry, queue_size = 10)
         self.gt_pub = rospy.Publisher("/gt_pose", PoseArray, queue_size = 10)
+        self.pp_pub = rospy.Publisher("/pp_pose", PoseArray, queue_size = 10)
 
         # Set up subscribers.
         # We don't need callbacks to compare against inerf.
@@ -145,6 +148,7 @@ class Navigator(NavigatorBase):
                 size = (self.num_particles, 6))
 
         self.initial_particles = self.set_initial_particles()
+         
         self.filter = ParticleFilter(self.initial_particles)
 
     def vio_callback(self, msg):
@@ -211,19 +215,78 @@ class Navigator(NavigatorBase):
             batch = self.nerf.coords[rand_inds]
 
         loss_poses = []
+
+        #  ###AR#####
+        
+        # num_particles = 30
+        # num_dimensions = 6  # Assuming 3 for position (x, y, z) and 3 for orientation (pitch, yaw, roll)
+        # max_iterations = 100
+        # cognitive_weight = 0.5
+        # social_weight = 0.3
+        # inertia_weight = 0.9
+        # min_inertia = 0.4
+        # max_inertia = 0.9
+        # learning_rate = 0.01
+
+    
+        # velocities = np.zeros_like(particles_position_before_update)
+        # personal_best_positions = np.copy(particles_position_before_update)
+        # personal_best_scores = np.full(self.num_particles, np.inf)
+        # global_best_position = None
+        # global_best_score = np.inf
+
+
+        # target_s = self.nerf.obs_img_noised[batch[:, 1], batch[:, 0]] # TODO check ordering here
+        # target_s = torch.Tensor(target_s).to(device)
+
+
+        # for iteration in range(max_iterations):
+        #     for index, particle in enumerate(particles_position_before_update):
+        #         pose = torch.Tensor(particle).to(device)
+        #         rgb = get_loss(pose, self.nerf.model, self.nerf.a, batch, self.nerf.batch_size)
+        #         rgb = torch.tensor(rgb)
+        #         loss = img2mse(rgb, target_s)
+
+        #         if loss < personal_best_scores[i]:
+        #             personal_best_scores[i] = loss
+        #             personal_best_positions[i] = particle
+
+        #         if loss < global_best_score:
+        #             global_best_score = loss
+        #             global_best_position = particle
+
+            
+        #     for i, (particle, velocity) in enumerate(zip(particles, velocities)):
+        # # Gradient-informed velocity update
+        #         #gradient_influence = learning_rate * gradient
+        #         inertia = inertia_weight * velocity
+        #         cognitive = cognitive_weight * np.random.rand(num_dimensions) * (personal_best_positions[i] - particle)
+        #         social = social_weight * np.random.rand(num_dimensions) * (global_best_position - particle)
+        #         new_velocity = inertia + cognitive + social 
+        
+        # # Update the particle's velocity and position
+        #         velocities[i] = new_velocity
+        #         particles[i] += new_velocity
+
+
+
+
+
+
         for index, particle in enumerate(particles_position_before_update):
-            loss_pose = np.zeros((4,4))
-            rot = particles_rotation_before_update[index]
-            loss_pose[0:3, 0:3] = rot.matrix()
-            loss_pose[0:3,3] = particle[0:3]
-            loss_pose[3,3] = 1.0
-            loss_poses.append(loss_pose)
+           loss_pose = np.zeros((4,4))
+           rot = particles_rotation_before_update[index]
+           loss_pose[0:3, 0:3] = rot.matrix()
+           loss_pose[0:3,3] = particle[0:3]
+           loss_pose[3,3] = 1.0
+           loss_poses.append(loss_pose)
         losses, nerf_time = self.nerf.get_loss(loss_poses, batch, self.photometric_loss)
    
         for index, particle in enumerate(particles_position_before_update):
             
-            self.filter.weights[index] = 1/losses[index]
+           self.filter.weights[index] = (1/losses[index])**2
         total_nerf_time += nerf_time
+
 
         self.filter.update()
         self.num_updates += 1
@@ -321,12 +384,27 @@ class Navigator(NavigatorBase):
         """
         check if rotation error is less than 5 degrees, or return the error if return_error is True
         """
-        acceptable_error = threshold # AR
+        acceptable_error = threshold  # Arbitrary threshold value for example purposes
         average_rot_t = (self.filter.compute_simple_rotation_average()).transpose()
-        # check rot in bounds by getting angle using https://math.stackexchange.com/questions/2113634/comparing-two-rotation-matrices
 
-        r_ab = average_rot_t @ (self.gt_pose[0:3,0:3])
-        rot_error = np.rad2deg(np.arccos((np.trace(r_ab) - 1) / 2))
+        # Enforce normalization on the average rotation matrix
+        U, _, Vt = np.linalg.svd(average_rot_t, full_matrices=False)
+        average_rot_t_normalized = np.dot(U, Vt)
+
+        # Now, ensure the ground truth rotation matrix is also normalized
+        U_gt, _, Vt_gt = np.linalg.svd(self.gt_pose[0:3, 0:3], full_matrices=False)
+        gt_pose_normalized = np.dot(U_gt, Vt_gt)
+
+        # Compute the relative rotation matrix using normalized matrices
+        r_ab = average_rot_t_normalized @ gt_pose_normalized
+
+        # Continue with your existing calculation
+        cos_angle = (np.trace(r_ab) - 1) / 2
+        # Since we've normalized the input matrices, cos_angle should naturally be within [-1, 1],
+        # but we'll still handle potential numerical precision issues without hard clamping.
+        cos_angle_adjusted = min(1.0, max(-1.0, cos_angle))
+
+        rot_error = np.rad2deg(np.arccos(cos_angle_adjusted))
         print("rotation error: ", rot_error)
         # AR start
         if write:
@@ -342,31 +420,82 @@ class Navigator(NavigatorBase):
 
         if self.plot_particles:
             self.visualize()
-    
-    def set_initial_particles(self):
-        initial_positions = np.zeros((self.num_particles, 3))
-        rots = []
-        for index, particle in enumerate(self.initial_particles_noise):
-            x = particle[0]
-            y = particle[1]
-            #z = particle[2] # AR
-            z = 0
-            #y = 0 # AR
-            #phi = 0 # AR
-            theta = 0
-            psi = 0
-            phi = particle[3]
-            #theta = particle[4] # AR
-            #psi = particle[5] # AR
+    #AR start
 
-            particle_pose = get_pose(phi, theta, psi, x, y, z, self.nerf.obs_img_pose, self.center_about_true_pose)
+    # def set_initial_particles(self):
+    #     initial_positions = np.zeros((self.num_particles, 3))
+    #     rots = []
+    #     for index, particle in enumerate(self.initial_particles_noise):
+    #         x = particle[0]
+    #         y = particle[1]
+    #         #z = particle[2] # AR
+    #         z = 0
+    #         #y = 0 # AR
+    #         #phi = 0 # AR
+    #         theta = 0
+    #         psi = 0
+    #         phi = particle[3]
+    #         #theta = particle[4] # AR
+    #         #psi = particle[5] # AR
+
+    #         particle_pose = get_pose(phi, theta, psi, x, y, z, self.nerf.predicted_pose, self.center_about_true_pose)
             
-            # set positions
-            initial_positions[index,:] = [particle_pose[0,3], particle_pose[1,3], particle_pose[2,3]]
-            # set orientations
-            rots.append(gtsam.Rot3(particle_pose[0:3,0:3]))
-            # print(initial_particles)
-        return {'position':initial_positions, 'rotation':np.array(rots)}
+    #         # set positions
+    #         initial_positions[index,:] = [particle_pose[0,3], particle_pose[1,3], particle_pose[2,3]]
+    #         # set orientations
+    #         rots.append(gtsam.Rot3(particle_pose[0:3,0:3]))
+    #         # print(initial_particles)
+    #     return {'position':initial_positions, 'rotation':np.array(rots)}
+
+
+
+
+    def set_initial_particles(self):
+        np.random.seed(42)  # For reproducibility
+        rots = []
+        gt_translation = self.nerf.obs_img_pose[:3, 3]
+        gt_rotation_matrix = self.nerf.obs_img_pose[:3, :3]
+        print('aaaaaaaaaaaaaaaaaaaaaaaa')
+        print(gt_rotation_matrix)
+
+        # Parameters for uniform initialization within a disk
+        disk_radius = self.particles_random_initial_position  # Radius of the disk
+        num_particles = self.num_particles
+
+        # Initialize positions uniformly within a disk
+        angles = np.random.uniform(low=0, high=2*np.pi, size=num_particles)
+        radii = np.sqrt(np.random.uniform(low=0, high=disk_radius**2, size=num_particles))
+
+        positions_x = gt_translation[0] + radii * np.cos(angles)
+        positions_y = gt_translation[1] + radii * np.sin(angles)
+        positions = np.stack((positions_x, positions_y, np.full(num_particles, gt_translation[2])), axis=-1)
+
+        # Get the Euler angles from the ground truth rotation matrix
+        gt_euler_angles = R.from_matrix(gt_rotation_matrix).as_euler('xyz', degrees=True)
+
+        # Define uniform distribution ranges for rotation angles. 
+        # These ranges should be determined based on your application's needs.
+        angle_range = self.particles_random_initial_rotation  # Example range of +/- 30 degrees for uniform distribution around the GT
+        low_angles = gt_euler_angles - angle_range
+        high_angles = gt_euler_angles + angle_range
+
+        # Initialize rotation angles with uniform distribution
+        random_rotation_angles = np.random.uniform(low=low_angles, high=high_angles, size=(num_particles, 3))
+
+        # Set pitch to zero to keep rotation in the XY plane
+        random_rotation_angles[:, 1] = 0
+
+        # Convert Euler angles to rotation matrices and create gtsam.Rot3 objects
+        for angles in random_rotation_angles:
+            rotation_obj = R.from_euler('xyz', angles, degrees=True)
+            rotation_matrix = rotation_obj.as_matrix()
+            rot3_object = gtsam.Rot3(rotation_matrix)
+            rots.append(rot3_object)  # Append the gtsam.Rot3 object to the list of rotations
+
+        return {'position': positions, 'rotation': np.array(rots)}
+
+
+        #AR end
 
     def set_noise(self, scale):
         self.px_noise = rospy.get_param('px_noise') / scale
@@ -378,7 +507,7 @@ class Navigator(NavigatorBase):
 
 
     def check_refine_gate(self):
-    
+
         # get standard deviation of particle position
         sd_xyz = np.std(self.filter.particles['position'], axis=0)
         norm_std = np.linalg.norm(sd_xyz)
@@ -478,28 +607,45 @@ class Navigator(NavigatorBase):
             gt_array.poses = [gt]
             gt_array.header.frame_id = "world"
             self.gt_pub.publish(gt_array)
- 
-def average_arrays(axis_list):
-    """
-    average arrays of different size
-    adapted from https://stackoverflow.com/questions/49037902/how-to-interpolate-a-line-between-two-other-lines-in-python/49041142#49041142
 
-    axis_list = [forward_passes_all, accuracy]
-    """
-    min_max_xs = [(min(axis), max(axis)) for axis in axis_list[0]]
+        
+        pp_array = PoseArray()
+        pp = Pose()
+            #AR start
+        pp_rot = gtsam.Rot3(self.nerf.predicted_pose[0:3,0:3]).toQuaternion()
+        pp.orientation.w = pp_rot.w()
+        pp.orientation.x = pp_rot.x()
+        pp.orientation.y = pp_rot.y()
+        pp.orientation.z = pp_rot.z()
+            
+        pp.position.x = self.nerf.predicted_pose[0,3]
+        pp.position.y = self.nerf.predicted_pose[1,3]
+        pp.position.z = self.nerf.predicted_pose[2,3]
+        pp_array.poses = [pp]
+        pp_array.header.frame_id = "world"
+        self.pp_pub.publish(pp_array)
+    
+    def average_arrays(axis_list):
+        """
+        average arrays of different size
+        adapted from https://stackoverflow.com/questions/49037902/how-to-interpolate-a-line-between-two-other-lines-in-python/49041142#49041142
 
-    new_axis_xs = [np.linspace(min_x, max_x, 100) for min_x, max_x in min_max_xs]
-    new_axis_ys = []
-    for i in range(len(axis_list[0])):
-        new_axis_ys.append(np.interp(new_axis_xs[i], axis_list[0][i], axis_list[1][i]))
+        axis_list = [forward_passes_all, accuracy]
+        """
+        min_max_xs = [(min(axis), max(axis)) for axis in axis_list[0]]
 
-    midx = [np.mean([new_axis_xs[axis_idx][i] for axis_idx in range(len(axis_list[0]))])/1000.0 for i in range(100)]
-    midy = [np.mean([new_axis_ys[axis_idx][i] for axis_idx in range(len(axis_list[0]))]) for i in range(100)]
+        new_axis_xs = [np.linspace(min_x, max_x, 100) for min_x, max_x in min_max_xs]
+        new_axis_ys = []
+        for i in range(len(axis_list[0])):
+            new_axis_ys.append(np.interp(new_axis_xs[i], axis_list[0][i], axis_list[1][i]))
 
-    plt.plot(midx, midy)
-    plt.xlabel("number of forward passes (in thousands)")
-    plt.grid()
-    plt.show()
+        midx = [np.mean([new_axis_xs[axis_idx][i] for axis_idx in range(len(axis_list[0]))])/1000.0 for i in range(100)]
+        midy = [np.mean([new_axis_ys[axis_idx][i] for axis_idx in range(len(axis_list[0]))]) for i in range(100)]
+
+        plt.plot(midx, midy)
+        plt.xlabel("number of forward passes (in thousands)")
+        plt.grid()
+        plt.show()
 
 # AR start
 def next_it(mode, pos_flag, rot_flag, forward_passes_flag):
@@ -508,13 +654,15 @@ def next_it(mode, pos_flag, rot_flag, forward_passes_flag):
     elif mode == 1: # Terminate based on rotation error
         return rot_flag and forward_passes_flag
     elif mode == 2: # Terminate based on position and rotation error
-        return (pos_flag or rot_flag) and forward_passes_flag
+        return (pos_flag or rot_flag) 
+
     
     return forward_passes_flag
 # AR end
 
 if __name__ == "__main__":
     rospy.init_node("nav_node")
+    np.random.seed(int(time.time()))
 
     run_inerf_compare = rospy.get_param("run_inerf_compare")
     use_logged_start = rospy.get_param("use_logged_start")
@@ -616,5 +764,3 @@ if __name__ == "__main__":
             if mcl.img_msg is not None:
                 mcl.rgb_run(mcl.img_msg)
                 mcl.img_msg = None # TODO not thread safe
-
-

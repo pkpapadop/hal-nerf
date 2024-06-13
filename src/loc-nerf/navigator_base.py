@@ -143,6 +143,7 @@ class NavigatorBase:
         self.gt_pose = None
         if not self.use_received_image:
             self.gt_pose = np.copy(self.nerf.obs_img_pose)
+            self.gt_pose_vector = np.copy(self.nerf.pose_vector)
         
         self.check_params()
 
