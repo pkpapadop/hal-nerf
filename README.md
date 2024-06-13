@@ -79,7 +79,7 @@ rviz -d $(rospack find locnerf)/rviz/rviz.rviz
 ```
 
 ## Requirements
-Tested on a computer with these specifications:
+Tested on a system with:
 - NVIDIA Geforce RTX 3060
 - 12th Gen Intel® Core™ i7-12700F × 20
 - Memory 32 GB
