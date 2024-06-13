@@ -99,6 +99,7 @@ docker_run()
     echo "Running docker..."
 
     docker run --gpus all -it \
+        --shm-size=4g \
         --env="DISPLAY=$DISPLAY" \
         --env="QT_X11_NO_MITSHM=1" \
         --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
@@ -109,11 +110,16 @@ docker_run()
         -v $poses_dir:/root/colmap_output \
         -v $ckpt:/root/weight.ckpt \
         -v $cfg_dir:/root/catkin_ws/src/Loc-NeRF/cfg \
-        -v $PWD/src/loc-nerf/full_filter.py:/root/catkin_ws/src/Loc-NeRF/src/full_filter.py \
-        -v $PWD/src/loc-nerf/nav_node.py:/root/catkin_ws/src/Loc-NeRF/src/nav_node.py \
-        -v $PWD/src/loc-nerf/navigator_base.py:/root/catkin_ws/src/Loc-NeRF/src/navigator_base.py \
-        -v $PWD/src/loc-nerf/particle_filter.py:/root/catkin_ws/src/Loc-NeRF/src/particle_filter.py \
-        -v $PWD/src/loc-nerf/nerfacto_loader.py:/root/catkin_ws/src/Loc-NeRF/src/nerfacto_loader.py \
+        -v $PWD/src/nerfstudio:/root/catkin_ws/src/Loc-NeRF/src/nerfstudio \
+        -v $PWD/src/loc_nerf/full_filter.py:/root/catkin_ws/src/Loc-NeRF/src/full_filter.py \
+        -v $PWD/src/loc_nerf/nav_node.py:/root/catkin_ws/src/Loc-NeRF/src/nav_node.py \
+        -v $PWD/src/loc_nerf/navigator_base.py:/root/catkin_ws/src/Loc-NeRF/src/navigator_base.py \
+        -v $PWD/src/loc_nerf/particle_filter.py:/root/catkin_ws/src/Loc-NeRF/src/particle_filter.py \
+        -v $PWD/src/loc_nerf/nerfacto_loader.py:/root/catkin_ws/src/Loc-NeRF/src/nerfacto_loader.py \
+        -v $PWD/src/pose_regressor:/root/catkin_ws/src/Loc-NeRF/src/pose_regressor \
+        -v $PWD/src/run_posenet.py:/root/catkin_ws/src/Loc-NeRF/src/run_posenet.py \
+        -v $PWD/src/nerfacto_loader_2.py:/root/catkin_ws/src/Loc-NeRF/src/nerfacto_loader_2.py \
+        -v $PWD/src/config_dfnet.txt:/root/catkin_ws/src/Loc-NeRF/src/config_dfnet.txt \
         --name $container_name \
         $image_name \
         bash
