@@ -1,0 +1,21 @@
+############################################### NeRF-Hist training example Cambridge ###############################################
+model_name=''
+basedir='/root/catkin_ws/src/Loc-NeRF/src/pose_regressor/logs'
+expname=iw
+datadir='/root/outputiw'
+df=1
+learning_rate=0.0001
+combine_loss_w=[1,0,0]
+load_pose_avg_stats=True
+epochs=50
+DFNet=True
+tripletloss=False
+featurenet_batch_size=4 # batch size, 4 or 8
+random_view_synthesis=False
+rvs_refresh_rate=20
+rvs_trans=3
+rvs_rotation=7.5
+d_max=1
+pretrain_model_path = '' # add your trained model for eval
+eval=False # add this for eval
+
