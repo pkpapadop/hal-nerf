@@ -453,9 +453,8 @@ class Navigator(NavigatorBase):
     def set_initial_particles(self):
         np.random.seed(42)  # For reproducibility
         rots = []
-        gt_translation = self.nerf.obs_img_pose[:3, 3]
-        gt_rotation_matrix = self.nerf.obs_img_pose[:3, :3]
-        print('aaaaaaaaaaaaaaaaaaaaaaaa')
+        gt_translation = self.nerf.predicted_pose[:3, 3]
+        gt_rotation_matrix = self.nerf.predicted_pose[:3, :3]
         print(gt_rotation_matrix)
 
         # Parameters for uniform initialization within a disk
