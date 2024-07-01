@@ -135,6 +135,9 @@ def feature_loss(feature_rgb, feature_target, img_in=True, per_channel=False):
     else:
         cos = torch.nn.CosineSimilarity(dim=1, eps=1e-6)
     loss = 1 - cos(fr, ft).mean()
+    print('aaaa')
+    
+
 
     return loss
 
@@ -207,12 +210,14 @@ def eval_on_batch(args, data, model, feat_model, pose, img_idx, hwf, half_res, d
         # torch.set_default_tensor_type('torch.cuda.FloatTensor')
         # rgb, disp, acc, extras = render(H, W, focal, chunk=args.chunk, rays=batch_rays, img_idx=img_idx, **render_kwargs_test)
 
+        ##### AR start #####
         rgb = vizualize(pose_nerf[0,:3,:4], nerfacto_model, nerfacto_params)
         rgb = torch.tensor(rgb)
         rgb = rgb[None,...].permute(0,3,1,2)
         #print(rgb.shape, target.shape)
         rgb = rgb.to('cpu')
         target = target.to('cpu')
+        ##### AR end #####
 
         loss = PoseLoss(args, pose_, pose, device)
         psnr = mse2psnr(img2mse(rgb, target))
@@ -324,7 +329,7 @@ def train_on_feature_batch(args, data, model, feat_model, pose, img_idx, hwf, op
     optimizer.zero_grad()
     psnr = mse2psnr(img2mse(rgb, target_s))
 
-    # end of every new tensor from onward is in GPU
+    #end of every new tensor from onward is in GPU
     torch.set_default_tensor_type('torch.FloatTensor')
     device_cpu = torch.device('cpu')
     iter_loss = loss.to(device_cpu).detach().numpy()
@@ -335,14 +340,14 @@ def train_on_feature_batch(args, data, model, feat_model, pose, img_idx, hwf, op
 
 def train_on_batch(args, data, model, feat_model, pose, img_idx, hwf, optimizer, half_res, device, nerfacto_model, nerfacto_params):
     ''' Perform 1 step of training '''
+ 
 
     H, W, focal = hwf
     data = data.to(device) # [1, 3, 240, 427] non_blocking=True
 
-
     # pose regression module
     _, pose_ = inference_pose_regression(args, data, device, model, retFeature=False)
-    pose_nerf = pose_.clone()
+    pose_nerf = pose_
     
 
     # direct matching module
@@ -352,7 +357,7 @@ def train_on_batch(args, data, model, feat_model, pose, img_idx, hwf, optimizer,
     pose = pose.to(device)
     img_idx = img_idx.to(device)
     # every new tensor from onward is in GPU, here memory cost is a bottleneck
-    #torch.set_default_tensor_type('torch.cuda.FloatTensor')
+    # torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
     # if half_res:
     #     rgb, disp, acc, extras = render(H//4, W//4, focal/4, chunk=args.chunk, c2w=pose_nerf[0,:3,:4], img_idx=img_idx, **render_kwargs_test)
@@ -366,10 +371,13 @@ def train_on_batch(args, data, model, feat_model, pose, img_idx, hwf, optimizer,
     #    rgb, disp, acc, extras = render(H, W, focal, chunk=args.chunk, c2w=pose_nerf[0,:3,:4], img_idx=img_idx, **render_kwargs_test)
     #    rgb = rgb[None,...].permute(0,3,1,2)
 
-    pose_nerf = torch.tensor(pose_nerf).to('cpu')
-    rgb = vizualize(pose_nerf[0,:3,:4], nerfacto_model, nerfacto_params)
-    rgb = torch.tensor(rgb)
+    # pose_nerf = torch.tensor(pose_nerf).to('cpu')
+    rgb = vizualize(pose_[0,:3,:4], nerfacto_model, nerfacto_params)
+    # rgb = rgb.detach()
     rgb = rgb[None,...].permute(0,3,1,2).to(device)
+    
+    # print('DES RGB')
+    # print(rgb.shape)
     
 
     # feature metric module
@@ -382,9 +390,10 @@ def train_on_batch(args, data, model, feat_model, pose, img_idx, hwf, optimizer,
     ### Loss Design Here ###
     # Compute RGB MSE Loss
     photo_loss = rgb_loss(rgb, data)
+    
 
     # Compute Feature MSE Loss
-    indices = torch.tensor(args.feature_matching_lvl).to('cuda')
+    indices = torch.tensor(args.feature_matching_lvl).to(device)
     #indices = torch.tensor([0])
     feature_rgb = torch.index_select(feature_rgb, 0, indices)
     feature_target = torch.index_select(feature_target, 0, indices)
@@ -393,23 +402,36 @@ def train_on_batch(args, data, model, feat_model, pose, img_idx, hwf, optimizer,
     feature_target = preprocess_features_for_loss(feature_target)
 
     feat_loss = feature_loss(feature_rgb[0], feature_target[0], per_channel=args.per_channel)
+
     
-    #print('TI exomen edo')
-    #print(feature_rgb[0].shape, feature_target[0].shape, feature_rgb.shape, feature_target.shape)
+    # print('TI exomen edo')
+    # print(feature_rgb[0].shape, feature_target[0].shape, feat_loss)
 
     # Compute Combine Loss if needed
     if args.combine_loss:
         pose_loss = PoseLoss(args, pose_, pose, device)
-        loss = args.combine_loss_w[0] * pose_loss + args.combine_loss_w[1] * photo_loss + args.combine_loss_w[2] * feat_loss
+        loss1_ = args.combine_loss_w[0] * pose_loss
+        #loss = args.combine_loss_w[0] * pose_loss + args.combine_loss_w[1] * photo_loss + args.combine_loss_w[2] * feat_loss
+        loss_2 =  args.combine_loss_w[1] * photo_loss
+        loss_3 = (args.combine_loss_w[2] * feat_loss)
+        print(loss_3)
+        loss = loss_3 + loss1_ + loss_2
 
-    ### Loss Design End
+    ## Loss Design End
+    # print('GIATI DEN ALLAZEIS GAMO TI MANA SU')
+    # print(loss)
     loss.backward()
+    for name, param in model.named_parameters():
+        if param.grad is not None:
+            print(name, param.grad.norm().item())  # Print the norm of the gradients
+        else:
+            print(name, "No gradient")
     optimizer.step()
     optimizer.zero_grad()
     psnr = mse2psnr(img2mse(rgb, data))
 
     # end of every new tensor from onward is in GPU
-    #torch.set_default_tensor_type('torch.FloatTensor')
+    # torch.set_default_tensor_type('torch.FloatTensor')
     device_cpu = torch.device('cpu')
     iter_loss = loss.to(device_cpu).detach().numpy()
     iter_loss = np.array([iter_loss])
@@ -465,7 +487,7 @@ def train_feature_matching(args, model, feat_model, optimizer, i_split, hwf, ner
     # render_kwargs_test['network_fn'] = disable_model_grad(render_kwargs_test['network_fn'])
     # render_kwargs_test['network_fine'] = disable_model_grad(render_kwargs_test['network_fine'])
 
-    N_epoch = 500
+    N_epoch = 300
     print('Begin')
     print('TRAIN views are', i_train)
     print('TEST views are', i_test)
@@ -488,7 +510,7 @@ def train_feature_matching(args, model, feat_model, optimizer, i_split, hwf, ner
         val_loss, val_psnr = eval_on_epoch(args, data_loaders, model, feat_model, hwf, half_res, device, nerfacto_model, nerfacto_params)
 
 
-        tqdm.write('At epoch {0:4d} : train loss: {1:.4f}, train psnr: {2:.4f}, val loss: {3:.4f}, val psnr: {4:.4f}'.format(epoch, loss, psnr, val_loss, val_psnr))
+        tqdm.write('At epoch {0:4d} : train loss: {1:.16f}, train psnr: {2:.16f}, val loss: {3:.16f}, val psnr: {4:.16f}'.format(epoch, loss, psnr, val_loss, val_psnr))
 
         # check wether to early stop
         early_stopping(val_loss, model, epoch=epoch, save_multiple=(not args.no_save_multiple), save_all=args.save_all_ckpt, val_psnr=val_psnr)

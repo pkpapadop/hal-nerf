@@ -4,14 +4,14 @@ def config_parser():
     parser.add_argument("-f", "--fff", help="a dummy argument to fool ipython", default="1")
     parser.add_argument("--multi_gpu", action='store_true', help='use multiple gpu on the server')
     parser.add_argument('--config', is_config_file=True, help='config file path')
-    parser.add_argument("--expname", type=str, default='iw', help='experiment name')
-    parser.add_argument("--basedir", type=str, default='/home/asterisreppas/hal-nerf_pose_reg/src/pose_regressor/logs', help='where to store ckpts and logs')
-    parser.add_argument("--datadir", type=str, default='/home/asterisreppas/outputiw', help='input data directory')
+    parser.add_argument("--expname", type=str, default='iw_2bags', help='experiment name')
+    parser.add_argument("--basedir", type=str, default='logs', help='where to store ckpts and logs')
+    parser.add_argument("--datadir", type=str, default='/home/asterisreppas/iw_old', help='input data directory')
     parser.add_argument("--places365_model_path", type=str, default='', help='ckpt path of places365 pretrained model')
 
     # 7Scenes
     parser.add_argument("--trainskip", type=int, default=1, help='will load 1/N images from train sets, useful for large datasets like 7 Scenes')
-    parser.add_argument("--df", type=float, default=1, help='image downscale factor')
+    parser.add_argument("--df", type=float, default=4, help='image downscale factor')
     parser.add_argument("--reduce_embedding", type=int, default=-1, help='fourier embedding mode: -1: paper default, \
                                                                         0: reduce by half, 1: remove embedding, 2: DNeRF embedding')
     parser.add_argument("--epochToMaxFreq", type=int, default=-1, help='DNeRF embedding mode: (based on Nerfie paper): \
@@ -27,7 +27,7 @@ def config_parser():
     parser.add_argument("--load_unique_view_stats", action='store_true', help='load unique views frame index')
     parser.add_argument("--finetune_unlabel", action='store_true', help='finetune unlabeled sequence like MapNet')
     parser.add_argument("--i_eval",   type=int, default=20, help='frequency of eval posenet result')
-    parser.add_argument("--save_all_ckpt", action='store_true', help='save all ckpts for each epoch')
+    parser.add_argument("--save_all_ckpt", action='store_true', default=False, help='save all ckpts for each epoch')
     parser.add_argument("--val_on_psnr", action='store_true', default=False, help='EarlyStopping with max validation psnr')
 
     # NeRF training options
@@ -79,9 +79,9 @@ def config_parser():
     parser.add_argument("--learning_rate", type=float, default=0.0001, help='learning rate')
     parser.add_argument("--batch_size", type=int, default=1, help='dataloader batch size, Attention: this is NOT the actual training batch size, \
                         please use --featurenet_batch_size for training')
-    parser.add_argument("--featurenet_batch_size", type=int, default=4, help='featurenet training batch size, choose smaller batch size')
+    parser.add_argument("--featurenet_batch_size", type=int, default=1, help='featurenet training batch size, choose smaller batch size')
     parser.add_argument("--pretrain_model_path", type=str, default='', help='model path of pretrained model')
-    parser.add_argument("--model_name", type=str, default='', help='pose model output folder name')
+    parser.add_argument("--model_name", type=str, default='iw_2bags', help='pose model output folder name')
     parser.add_argument("--combine_loss_w", nargs='+', type=float, default=[1, 0, 0], 
                         help='weights of combined loss ex, [1, 1, 1], \
                         default None, only use when combine_loss is True')
@@ -89,7 +89,7 @@ def config_parser():
     parser.add_argument("--resize_factor", type=int, default=4, help='image resize downsample ratio')
     parser.add_argument("--freezeBN", action='store_true', help='Freeze the Batch Norm layer at training PoseNet')
     parser.add_argument("--preprocess_ImgNet", action='store_true', help='Normalize input data for PoseNet')
-    parser.add_argument("--eval", action='store_true', help='eval model')
+    parser.add_argument("--eval", action='store_true', default=False, help='eval model')
     parser.add_argument("--no_save_multiple", action='store_true',default=True, help='default, save multiple posenet model, if true, save only one posenet model')
     parser.add_argument("--resnet34", action='store_true', default=False, help='use resnet34 backbone instead of mobilenetV2')
     parser.add_argument("--efficientnet", action='store_true', default=False, help='use efficientnet-b3 backbone instead of mobilenetV2')

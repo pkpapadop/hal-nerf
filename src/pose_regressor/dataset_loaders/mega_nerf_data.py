@@ -1,52 +1,24 @@
-"""
-pytorch data loader for the mega_nerf dataset
-"""
 import os
 import os.path as osp
 import numpy as np
-from PIL import Image
 import torch
-from torch.utils import data
-import sys
 import cv2
-#from pose_regressor.dataset_loaders.utils.color import rgb_to_yuv
-from torchvision.datasets.folder import default_loader
-sys.path.insert(0, '../../')
+from torchvision import transforms
+from PIL import Image
+from torch.utils import data
 
-
-def load_image(filename, loader=default_loader):
-    try:
-        img = loader(filename)
-    except IOError as e:
-        print('Could not load image {:s}, IOError: {:s}'.format(filename, e))
-        return None
-    except:
-        print('Could not load image {:s}, unexpected error'.format(filename))
-        return None
-    return img
-
-
-def load_depth_image(filename):
-    try:
-        img_depth = Image.fromarray(np.array(Image.open(filename)).astype("uint16"))
-    except IOError as e:
-        print('Could not load image {:s}, IOError: {:s}'.format(filename, e))
-        return None
-    return img_depth
-
+def load_image(path):
+    return Image.open(path).convert('RGB')
 
 class mega_nerf_data(data.Dataset):
-    def __init__(self, scene, data_path, train, transform=None, target_transform=None, seed=7, df=2., trainskip=1,
-                 testskip=1, hwf=[480, 960, 480.], ret_idx=False, fix_idx=False, ret_hist=False, hist_bin=10):
+    def __init__(self, scene, data_path, mode, transform=None, target_transform=None, seed=7, df=2., trainskip=1, testskip=1, hwf=[480, 960, 480.], ret_idx=False, fix_idx=False, ret_hist=False, hist_bin=10):
         """
         :param scene: scene name ['chess', 'pumpkin', ...]
         :param data_path: root 7scenes data directory.
         Usually '../data/deepslam_data/7Scenes'
-        :param train: if True, return the training images. If False, returns the
-        testing images
+        :param mode: 'train', 'val', or 'test'
         :param transform: transform to apply to the images
         :param target_transform: transform to apply to the poses
-        :param skip_images: If True, skip loading images and return None instead
         :param df: downscale factor
         :param trainskip: due to 7scenes are so big, now can use less training sets # of trainset = 1/trainskip
         :param testskip: skip part of testset, # of testset = 1/testskip
@@ -62,19 +34,22 @@ class mega_nerf_data(data.Dataset):
         self.W = int(self.W)
         np.random.seed(seed)
 
-        self.train = train
+        self.mode = mode
         self.ret_idx = ret_idx
         self.fix_idx = fix_idx
         self.ret_hist = ret_hist
         self.hist_bin = hist_bin  # histogram bin size
 
-        if self.train:
+        if self.mode == 'train':
             root_dir = osp.join(data_path, scene) + '/train'
-        else:
+        elif self.mode == 'val':
             root_dir = osp.join(data_path, scene) + '/val'
+        elif self.mode == 'test':
+            root_dir = osp.join(data_path, scene) + '/test'
+        else:
+            raise ValueError("Mode must be 'train', 'val', or 'test'")
 
         rgb_dir = root_dir + '/rgbs/'
-
         pose_dir = root_dir + '/metadata/'
 
         # collect poses and image names
@@ -91,12 +66,10 @@ class mega_nerf_data(data.Dataset):
 
         # trainskip and testskip
         frame_idx = np.arange(len(self.rgb_files))
-        if train and trainskip > 1:
-            frame_idx_tmp = frame_idx[::trainskip]
-            frame_idx = frame_idx_tmp
-        elif not train and testskip > 1:
-            frame_idx_tmp = frame_idx[::testskip]
-            frame_idx = frame_idx_tmp
+        if self.mode == 'train' and trainskip > 1:
+            frame_idx = frame_idx[::trainskip]
+        elif self.mode in ['val', 'test'] and testskip > 1:
+            frame_idx = frame_idx[::testskip]
         self.gt_idx = frame_idx
 
         self.rgb_files = [self.rgb_files[i] for i in frame_idx]
@@ -147,10 +120,9 @@ class mega_nerf_data(data.Dataset):
             pose = self.target_transform(pose)
 
         if self.ret_idx:
-            if self.train and self.fix_idx == False:
+            if self.mode == 'train' and not self.fix_idx:
                 return img, pose, index
             else:
                 return img, pose, 0
 
-      
         return img, pose

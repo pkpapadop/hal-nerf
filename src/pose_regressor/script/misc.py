@@ -8,6 +8,10 @@ import math
 import time
 from copy import deepcopy
 from nerfacto_loader_2 import vizualize
+import os
+from pose_regressor.script.dfnet import DFNet as FeatureNet 
+from pose_regressor.script.dfnet import DFNet as PoseNet
+
 
 img2mse = lambda x, y: torch.mean((x - y) ** 2)
 mse2psnr = lambda x: -10. * torch.log(x) / torch.log(torch.Tensor([10.]).to('cuda'))
@@ -42,6 +46,26 @@ rot_psi = lambda psi: np.array([
     [0, 0, 0, 1]], dtype=float)
 
 
+def load_exisiting_model(args, isFeatureNet=False):
+    ''' Load a pretrained DFNet model '''
+    if isFeatureNet==False: # load the Pose Estimator F
+        if args.DFNet_s:
+            model = PoseNet3()
+            model.load_state_dict(torch.load(args.pretrain_model_path))
+        else:
+            model = PoseNet()
+            model.load_state_dict(torch.load(args.pretrain_model_path))
+        return model
+    else:
+        if args.DFNet_s: # load the Feature Extractor G
+            model = FeatureNet3()
+            model.load_state_dict(torch.load(args.pretrain_featurenet_path))
+        else:
+            model=FeatureNet()
+            model.load_state_dict(torch.load(args.pretrain_featurenet_path))
+        return model
+
+
 def render_nerfw_imgs(args, dl, hwf, device, nerfacto_model, nerfacto_params):
     ''' render nerfw imgs, save unscaled pose and results'''
     H, W, focal = hwf
@@ -57,10 +81,10 @@ def render_nerfw_imgs(args, dl, hwf, device, nerfacto_model, nerfacto_params):
         if batch_idx % 10 == 0:
             print("renders {}/total {}".format(batch_idx, len(dl.dataset)))
 
-        target = target[0].permute(1,2,0).to(device) # (240,360,3)
+        target = target[0].permute(1,2,0) # (240,360,3)
         pose = pose.reshape(3,4) # reshape to 3x4 rot matrix
 
-        img_idx = img_idx.to(device)
+        img_idx = img_idx
         pose_nerf = pose.clone()
 
         # rescale the predicted pose to nerf scales
@@ -89,6 +113,9 @@ def render_nerfw_imgs(args, dl, hwf, device, nerfacto_model, nerfacto_params):
         rgb_list.append(rgb.cpu())
         pose_list.append(pose.cpu())
         img_idx_list.append(img_idx.cpu())
+        #print_gpu_memory_usage()
+        #print_full_gpu_memory_usage()
+        torch.cuda.empty_cache()
 
     targets = torch.stack(target_list).detach()
     rgbs = torch.stack(rgb_list).detach()
@@ -171,33 +198,38 @@ def compute_error_in_q(args, dl, model, device, results, batch_size=1):
 
 
 def get_error_in_q(args, dl, model, sample_size, device, batch_size=1):
-    ''' Convert Rotation matrix to quaternion, then calculate the location errors. original from PoseNet Paper '''
+    ''' Convert Rotation matrix to quaternion, then calculate the location errors. Original from PoseNet Paper '''
     model.eval()
 
+    # Initialize results array to store errors for each sample
     results = np.zeros((sample_size, 2))
     results, vis_info = compute_error_in_q(args, dl, model, device, results, batch_size)
+
+    # Compute median and mean of the errors
     median_result = np.median(results, axis=0)
     mean_result = np.mean(results, axis=0)
 
-    # standard log
-    print('Median error {}m and {} degrees.'.format(median_result[0], median_result[1]))
-    print('Mean error {}m and {} degrees.'.format(mean_result[0], mean_result[1]))
+    # Standard log
+    print('Median error: {:.4f}m and {:.4f} degrees.'.format(median_result[0], median_result[1]))
+    print('Mean error: {:.4f}m and {:.4f} degrees.'.format(mean_result[0], mean_result[1]))
 
-    # visualize results
-    output_pose(args, vis_info['pose'])
-    return median_result[0], median_result[1], mean_result[0], mean_result[1]
+    # Print individual errors for each testing sample
+    for i, result in enumerate(results):
+        print('Sample {}: Error = {:.4f}m, {:.4f} degrees.'.format(i, result[0], result[1]))
 
+    # Return individual results along with median and mean errors
+    return  median_result[0], median_result[1], mean_result[0], mean_result[1]
 
 def output_pose(args, poses):
     poses = poses.squeeze()
     poses = poses.reshape((-1, 12))
-    # np.savetxt(args.output_path, poses)
+    np.savetxt(args.output_path, poses)
 
 
-def get_render_error_in_q(args, model, sample_size, device, rgbs, poses, batch_size=1):
+def get_render_error_in_q(args, model, sample_size, device, rgbs, poses, batch_size, basedir, expname):
     ''' use nerf render imgs instead of use real imgs '''
     model.eval()
-
+    os.makedirs(os.path.join(basedir, expname, 'output_poses'), exist_ok=True)
     results = np.zeros((sample_size, 2))
     print("to be implement...")
 
@@ -206,16 +238,18 @@ def get_render_error_in_q(args, model, sample_size, device, rgbs, poses, batch_s
     ang_error_list = []
 
     for i in range(sample_size):
-        data = rgbs[i:i + 1]
+        pose_path = os.path.join(basedir, expname, 'output_poses', f'output_pose_{i}.pt')
+        data = rgbs[i]
+        data = data.unsqueeze(0)
         print(data.shape)
-        pose = poses[i:i + 1].reshape(batch_size, 12)
+        pose = poses[i].reshape(batch_size, 12)
 
         data = data.to(device)  # input
         pose = pose.reshape((batch_size, 3, 4)).numpy()  # label
 
         # using SVD to make sure predict rotation is normalized rotation matrix
         with torch.no_grad():
-            _, predict_pose = model(data)
+            _, predict_pose = model(data, False)
             R_torch = predict_pose.reshape((batch_size, 3, 4))[:, :3, :3]  # debug
             predict_pose = predict_pose.reshape((batch_size, 3, 4)).cpu().numpy()
 
@@ -226,6 +260,10 @@ def get_render_error_in_q(args, model, sample_size, device, rgbs, poses, batch_s
             u, s, v = torch.svd(R_torch)
             Rs = torch.matmul(u, v.transpose(-2, -1))
         predict_pose[:, :3, :3] = Rs[:, :3, :3].cpu().numpy()
+        # print('PREDICT POSE SHAPE')
+        # print(predict_pose.shape)
+
+        torch.save(predict_pose, pose_path)
 
         pose_q = transforms.matrix_to_quaternion(
             torch.Tensor(pose[:, :3, :3]))  # .cpu().numpy() # gnd truth in quaternion
@@ -466,12 +504,12 @@ def perturb_single_render_pose(poses, x, angle):
         # perturb translational pose
         trans_rand = np.random.uniform(-x, x, 2)  # random number of 3 axis pose perturbation
         # printtrans_rand_3 = np.append(trans_rand, 0)("trans_rand", trans_rand)
-        trans_rand_3 = np.append(trans_rand, 0.05)
+        trans_rand_3 = np.append(trans_rand, 0)
 
         # # normalize 3 axis perturbation to x, this will make sure sum of 3-axis perturbation to be x constant
         # trans_rand = trans_rand / abs(trans_rand).sum() * x
         new_c2w[i, :, 3] = loc + trans_rand_3  # perturb pos between -1 to 1
-        # print("new new_c2w[i,:,3]", new_c2w[i,:,3])
+    
 
     return new_c2w
 

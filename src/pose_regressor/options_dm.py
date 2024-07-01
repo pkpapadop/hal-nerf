@@ -80,7 +80,8 @@ def config_parser():
     parser.add_argument("--batch_size", type=int, default=1, help='dataloader batch size, Attention: this is NOT the actual training batch size, \
                         please use --featurenet_batch_size for training')
     parser.add_argument("--featurenet_batch_size", type=int, default=4, help='featurenet training batch size, choose smaller batch size')
-    parser.add_argument("--pretrain_model_path", type=str, default='/home/asterisreppas/pose_regressor_locnerf/logs/certh_train_val_45_rot_0.1_trans_only_psi/check.pt', help='model path of pretrained model')
+    parser.add_argument("--pretrain_model_path", type=str, default='', help='model path of pretrained pose regrssion model')
+    parser.add_argument("--pretrain_featurenet_path", type=str, default='', help='model path of pretrained featurenet model')
     parser.add_argument("--model_name", type=str, default='certh_train_val_45_rot_0.1_trans_dm', help='pose model output folder name')
     parser.add_argument("--combine_loss_w", nargs='+', type=float, default=[0., 0., 1.], 
                         help='weights of combined loss ex, [1, 1, 1], \
