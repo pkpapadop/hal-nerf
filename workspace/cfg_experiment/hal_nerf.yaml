@@ -1,15 +1,15 @@
   #### termination criteria ####
-position_error_threshold: 0.05
-rotation_error_threshold: 5
+position_error_threshold: 0.0082
+rotation_error_threshold: 0.309
 #std_threshold: 
 termination_mode: 2 # 0: use position_error_threshold, 1: use rotation_error_threshold, 2: use position_error_threshold and rotation_error_threshold
-output_path: /home/iw/image_50/1
-export_images: True # exported images will be stored in <output_path>/images folder
+output_path: /home/iw/100_particles_64_pixel_0.02_p_0.04_t_IMAGE20_initial_0.15_t_10_d
+export_images: False # exported images will be stored in <output_path>/images folder
 
 #### particles initialization parametrs ####
-particles_random_initial_position: 0.5
-particles_random_initial_rotation: 50
-image_idx : 45
+particles_random_initial_position: 0.05
+particles_random_initial_rotation: 5
+image_idx : 27
 
 
 #### filtering flags ####
@@ -20,13 +20,13 @@ use_weighted_avg: True # Use weighted average to computer position estimate, oth
 no_ndc: False # note that custom data cannot use ndc but LLFF should
 
 #### main update step params ####
-factor: 2 #image down-sample factor
+factor: 4 #image down-sample factor
 course_samples: 64 # number course samples per ray
 fine_samples: 64 # number fine samples per ray
 photometric_loss: rgb # rgb
 sampling_strategy: random # only random is supported right now
 batch_size: 64 # number of pixels to use for measurement points
-num_particles: 100 # Number of initial particles.
+num_particles: 200 # Number of initial particles.
 
 #### dataset and weight loading ####
 dataset_type: llff # llff, custom
@@ -36,7 +36,7 @@ data_dir: /root # only needed for LLFF data
 #### convergence protection #####
 # randomly sample a few particle positions to protect against false convergence
 # TODO eventually want to just remove the lowest weight particles instead of random particles
-use_convergence_protection: True
+use_convergence_protection: False
 number_convergence_particles: 10 # number of particles to distribute
 convergence_noise: 0.2 # meters, uniformly sample this far from mean for each axis.
 
@@ -47,7 +47,7 @@ log_results: False # Save pose estimate for each iteration. Also save a file wit
 use_logged_start: False # use saved logs for initial pose
 log_prefix: use_annealing # add a prefix to the log file names for convenience to keep track of different runs
 log_directory: /home/dominic/mocNeRF_ws/src/locnerf/logs/global_loc # Directory to save npy files.
-forward_passes_limit: 78643200 # end optimization after this number of forward passes have run
+forward_passes_limit: 500000000 # end optimization after this number of forward passes have run
 
 #### custom data realtime tracking mode params ####
 # Note these values are all overwritten/not used if run_inerf_compare is True
@@ -97,13 +97,13 @@ alpha_super_refine: 0.03
 
 #### motion model noise params ####
 # position noise
-px_noise: 0.04
-py_noise: 0.04
-pz_noise: 0.01
+px_noise: 0.02
+py_noise: 0.02
+pz_noise: 0.02
 # rotation noise
 rot_x_noise: 0.04
 rot_y_noise: 0.04
-rot_z_noise: 0.01
+rot_z_noise: 0.04
 
 #### visualization params ####
 visualize_particles: True # publish particles for rviz
