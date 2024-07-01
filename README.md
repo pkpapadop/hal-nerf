@@ -14,16 +14,17 @@ This pipeline contains two parts:
 ../hal_nerf/workspace
 ```
 
-2) Rename your .ckpt file (pre-trained nerfacto model) as "weight.ckpt" and move it inside the following directory:
+2) Rename the folder that contains the pre-trained nerfacto model as "model" and move it inside the following directory:
 
 ```bash
-../hal_nerf/workspace
+../hal_nerf/workspace/colmap_output
 ```
+In config.yml file that nerfacto creates, you have to change the 'output_dir' as /root/colmap_output and the 'data' as /root/colmap_output 
 
 3) Compose the image with this command:
 
 ```bash
-docker build -t your_image_name .
+docker build -t <your_image_name> .
 ```
 
 4) Change bash file permission with this command:
@@ -31,10 +32,10 @@ docker build -t your_image_name .
 ```bash
 chmod +x run.bash
 ```
-5) Run bash script (5 arguments):
+5) Run bash script (4 arguments):
 
 ```bash
-./run.bash --container-name <your_container_name> --cfg-dir $PWD/workspace/cfg_experiment --image-name <your_image_name> --poses-dir $PWD/workspace/colmap_output --ckpt $PWD/workspace/weight.ckpt
+./run.bash --container-name <your_container_name> --cfg-dir $PWD/workspace/cfg_experiment --image-name <your_image_name> --poses-dir $PWD/workspace/colmap_output
 ```
 
 6) Now you are inside the container. First, prepare the dataset for DFNet training:
@@ -49,7 +50,7 @@ python colmap_to_mega_nerf.py --model_path /root/colmap_output/colmap --images_p
 python run_posenet.py --config config_dfnet.txt
 ```
 
-with config_dfnet.txt you can control some of the network training parameters
+with config_dfnet.txt you can control some of the pose regressor network training parameters. Especially, with 'random_view_synthesis=True' you can augment your training dataset using a pre-trained nerfacto model. 'rvs_refresh_rate', 'rvs_trans', and 'rvs_rotation' are the parameters that control how many epochs the dataset will be augmented, the uniform distribution for translation component perturbation and the uniform distribution for rotation component perturbation accordingly.
 
 
 8) Now, you can run HAL-NeRF by running this command:
@@ -63,12 +64,12 @@ roslaunch locnerf navigate.launch parameter_file:=<param_file.yaml>
   2) rotation_error_threshold 
   3) termination_mode    #  0: use position_error_threshold, 1: use rotation_error_threshold, 2: use position_error_threshold and rotation_error_threshold
   4) output_path    # the path in which the results will be saved inside the container.
-  5) export_images    # If true, the experiment results contain also visual information.
+  5) export_images    # If true, the experiment results also contain visual information.
   6) particles_random_initial_position around DFNet pose prediction    # initalization of particles' position
   7) particles_random_initial_rotation around DFNet psoe prediction    # initialization of particles' rotation
   8) image_idx    # the ground truth image. We tried to find the pose of the camera when this image was taken. It is used only for visualization purposes to compare it with the predicted result.
 
-9) If you want to visualize the experiment, you can activate rviz visualization. In another terminal, access the running container with this command:
+9) If you want to visualize the experiment, activate rviz visualization. In another terminal, access the running container with this command:
 
 ```bash
 docker exec -it your_container_name /bin/bash
