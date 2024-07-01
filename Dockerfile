@@ -1,5 +1,3 @@
-
-
 FROM nvidia/cuda:11.7.1-cudnn8-devel-ubuntu20.04
 
 
@@ -80,17 +78,11 @@ RUN cd ~/catkin_ws/src/Loc-NeRF && \
     
 #NERFSTUDIO
 
-ARG CACHEBUSTER=none
 
 RUN mkdir -p /root/catkin_ws/src/Loc-NeRF/src/nerfstudio && \
     git clone https://github.com/nerfstudio-project/nerfstudio.git /root/catkin_ws/src/Loc-NeRF/src/nerfstudio && \
-    cd /root/catkin_ws/src/Loc-NeRF/src/nerfstudio && \
-    git checkout tags/v0.3.4
+    cd /root/catkin_ws/src/Loc-NeRF/src/nerfstudio
 
-
-
-
-RUN pip3 install --upgrade pip setuptools
 
 WORKDIR /root/catkin_ws/src/Loc-NeRF
 
@@ -98,11 +90,17 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     python3.9-dev
 
+RUN pip3 install --upgrade pip setuptools
+
 RUN cd /root/catkin_ws/src/Loc-NeRF/src/nerfstudio && pip3 install --ignore-installed -e .
+
 
 RUN pip3 uninstall torch torchvision -y
 RUN pip3 install torch==2.0.1+cu117 torchvision==0.15.2+cu117 --extra-index-url https://download.pytorch.org/whl/cu117
 #RUN pip3 install torch==1.13.1+cu117 torchvision==0.14.1+cu117 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu117
+RUN pip3 uninstall setuptools -y
+
+RUN pip3 install setuptools
 
 RUN TCNN_CUDA_ARCHITECTURES=86 pip3 install git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch
 
@@ -141,4 +139,3 @@ COPY src/*.py ./
 # WORKDIR /root
 
 CMD ["bash"]
-
