@@ -284,7 +284,7 @@ class Navigator(NavigatorBase):
    
         for index, particle in enumerate(particles_position_before_update):
             
-           self.filter.weights[index] = (1/losses[index])**2
+           self.filter.weights[index] = (1/losses[index])**4
         total_nerf_time += nerf_time
 
 
@@ -455,6 +455,7 @@ class Navigator(NavigatorBase):
         rots = []
         gt_translation = self.nerf.predicted_pose[:3, 3]
         gt_rotation_matrix = self.nerf.predicted_pose[:3, :3]
+        print('aaaaaaaaaaaaaaaaaaaaaaaa')
         print(gt_rotation_matrix)
 
         # Parameters for uniform initialization within a disk
@@ -649,11 +650,11 @@ class Navigator(NavigatorBase):
 # AR start
 def next_it(mode, pos_flag, rot_flag, forward_passes_flag):
     if mode == 0: # Terminate based on position error 
-        return pos_flag and forward_passes_flag
+        return pos_flag 
     elif mode == 1: # Terminate based on rotation error
-        return rot_flag and forward_passes_flag
+        return rot_flag 
     elif mode == 2: # Terminate based on position and rotation error
-        return (pos_flag or rot_flag) 
+        return ((pos_flag or rot_flag) and forward_passes_flag) 
 
     
     return forward_passes_flag
@@ -731,6 +732,8 @@ if __name__ == "__main__":
                                        pos_flag=not(mcl_local.check_if_position_error_good(threshold=mcl_local.position_error_threshold, write=True)), 
                                        rot_flag=not(mcl_local.check_if_rotation_error_good(threshold=mcl_local.rotation_error_threshold, write=True)),
                                        forward_passes_flag=forward_passes_flag)
+                            print(flag)
+                            
                         ii += 1
                 except Exception as e:
                     print(f"An error occurred: {e}")
