@@ -319,8 +319,8 @@ def train():
     #### AR START ####
     transform_path = '/root/colmap_output'
     checkpoint_path = '/root/weight.ckpt'
-    factor = 2
-    nerfacto_model = load_model(transform_path, checkpoint_path, factor) 
+    factor = 4
+    nerfacto_model = load_model() 
     nerfacto_params = get_params(transform_path, factor)
     #### AR END ####
     #assert args.dataset_type == 'mega_nerf'

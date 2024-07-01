@@ -30,13 +30,14 @@ from nerfstudio.model_components.ray_generators import RayGenerator
 from nerfstudio.cameras.cameras import Cameras
 from nerfstudio.cameras.cameras import Cameras, CameraType
 from scipy.spatial.transform import Rotation
-from torchmetrics.image import StructuralSimilarityIndexMeasure
+# from torchmetrics.image import StructuralSimilarityIndexMeasure
 import torch.nn.functional as F
 import cv2
 from nerfstudio.data.datasets.base_dataset import InputDataset
 import matplotlib.image as mpimg
 from nerfstudio.cameras.camera_optimizers import CameraOptimizer, CameraOptimizerConfig
 from pose_regressor.script.dfnet import DFNet, DFNet_s
+from nerfstudio.utils.eval_utils import eval_setup 
 
 
 
@@ -80,31 +81,14 @@ from pose_regressor.script.dfnet import DFNet, DFNet_s
 
 
 
-def load_model(transform_path, checkpoint_path, factor):
-  global loaded_state
-
-  config = ColmapDataParserConfig(data = Path(transform_path) , downscale_factor = factor)
-  dataparser = config.setup()
-  dataparser_outputs = dataparser.get_dataparser_outputs(split="train")
-  scene = dataparser_outputs.scene_box
-  print(scene)
-#Model and model_state_dict
-  #model = NerfactoModel(NerfactoModelConfig(ModelConfig(InstantiateConfig(PrintableConfig))),  scene, 70)
-  model = NerfactoModel(NerfactoModelConfig(),  scene , 796)
-# Load checkpoint
-  root = checkpoint_path
-
-  loaded_state = torch.load(root)
-  loaded_state = loaded_state["pipeline"]
-  common_substring = "_model."
-
-# Create a new dictionary with updated keys
-  updated_dict = {k.replace(common_substring, ""): v for k, v in loaded_state.items()}
-
-  model.load_state_dict(updated_dict, strict=False)
-  model.eval()
+def load_model():
   
-  return model
+    config_path = Path('/root/colmap_output/model/nerfacto/default/config.yml')
+    config, pipeline, checkpoint_path, step = eval_setup(config_path=config_path)
+    model = pipeline.model
+
+
+    return model
  
   
  

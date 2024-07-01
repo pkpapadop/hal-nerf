@@ -337,8 +337,8 @@ def _get_opts() -> Namespace:
 def main(hparams: Namespace) -> None:
     cameras, images, _ = read_model(hparams.model_path + '/sparse/0')
     transform_path = hparams.model_path
-    factor = 1
-    config = ColmapDataParserConfig(data = Path(transform_path) , downscale_factor = factor)
+    factor = 4
+    config = ColmapDataParserConfig(data=Path(transform_path), downscale_factor=factor, orientation_method="none", auto_scale_poses="true", center_method="none", load_3D_points=False, colmap_path='/root/colmap_output/colmap/sparse/0')
     dataparser = config.setup()
     dataparser_outputs = dataparser.get_dataparser_outputs(split="train")
     transform = dataparser_outputs.dataparser_transform
@@ -355,17 +355,9 @@ def main(hparams: Namespace) -> None:
         w2c[:3, 3] = torch.FloatTensor(image.tvec)
         c2w = torch.inverse(w2c)
         c2w[0:3, 1:3] *= -1
-        c2w = c2w.to('cuda')
+        c2w = c2w.cuda()
         c2w = transform @ c2w
         c2w[:3, 3] *= scale
-
-
-        
-
-        # c2w = torch.hstack((
-        #     RDF_TO_DRB @ c2w[:3, :3] @ torch.inverse(RDF_TO_DRB),
-        #     RDF_TO_DRB @ c2w[:3, 3:]
-        # ))
 
         c2ws[image.id] = c2w
 
@@ -378,65 +370,64 @@ def main(hparams: Namespace) -> None:
     diagonal = dist.max()
 
     print(origin, diagonal, max_values, min_values)
-    # coordinates = {
-    #     'origin_drb': origin,
-    #     'pose_scale_factor': hparams.scale
-    # }
 
     output_path = Path(hparams.output_path)
     output_path.mkdir(parents=True)
     (output_path / 'train' / 'metadata').mkdir(parents=True)
     (output_path / 'val' / 'metadata').mkdir(parents=True)
+    (output_path / 'test' / 'metadata').mkdir(parents=True)
 
     (output_path / 'train' / 'rgbs').mkdir(parents=True)
     (output_path / 'val' / 'rgbs').mkdir(parents=True)
+    (output_path / 'test' / 'rgbs').mkdir(parents=True)
 
     images_path = Path(hparams.images_path)
 
+    test_indices = set(range(270, 300)).union(set(range(350, 370))).union(set(range(168, 203)))
+    test_images = {i: img for i, img in images.items() if i in test_indices}
+    remaining_images = {i: img for i, img in images.items() if i not in test_indices}
+
+    # Ensure no overlap between test and train/val sets
+    assert not test_indices.intersection(remaining_images.keys()), "Overlap between test and remaining images"
+
     with (output_path / 'mappings.txt').open('w') as f:
-        for i, image in enumerate(tqdm(sorted(images.values(), key=lambda x: x.name))):
-            if i % int(positions.shape[0] / hparams.num_val) == 0:
+        # Process test images
+        for i, image in enumerate(tqdm(sorted(test_images.values(), key=lambda x: x.name))):
+            split_dir = output_path / 'test'
+            process_image(image, cameras, c2ws, images_path, split_dir, f, i)
+            
+        # Process remaining images for train/val split
+        for i, image in enumerate(tqdm(sorted(remaining_images.values(), key=lambda x: x.name))):
+            if i % int(len(remaining_images) / hparams.num_val) == 0:
                 split_dir = output_path / 'val'
             else:
                 split_dir = output_path / 'train'
 
-            distorted = cv2.imread(str(images_path / image.name))
+            process_image(image, cameras, c2ws, images_path, split_dir, f, i)
 
-            camera = cameras[image.camera_id]
+def process_image(image, cameras, c2ws, images_path, split_dir, f, i):
+    distorted = cv2.imread(str(images_path / image.name))
 
-            # TODO: make camera model more flexible - should mainly involve changing the camera matrix accordingly
-            #assert camera.model == 'SIMPLE_RADIAL', camera.model
+    camera = cameras[image.camera_id]
 
-            camera_matrix = np.array([[camera.params[0], 0, camera.params[1]],
-                                      [0, camera.params[0], camera.params[2]],
-                                      [0, 0, 1]])
+    camera_matrix = np.array([[camera.params[0], 0, camera.params[1]],
+                              [0, camera.params[0], camera.params[2]],
+                              [0, 0, 1]])
 
-            #distortion = np.array([camera.params[3], 0, 0, 0])
-            #undistorted = cv2.undistort(distorted, camera_matrix, distortion)
-            cv2.imwrite(str(split_dir / 'rgbs' / '{0:06d}.jpg'.format(i)), distorted)
+    cv2.imwrite(str(split_dir / 'rgbs' / '{0:06d}.jpg'.format(i)), distorted)
 
-            camera_in_drb = c2ws[image.id]
-            #camera_in_drb[:, 3] = (camera_in_drb[:, 3] - origin) / hparams.scale
+    camera_in_drb = c2ws[image.id]
 
-            #assert np.logical_and(camera_in_drb >= -1, camera_in_drb <= 1).all()
+    metadata_name = '{0:06d}.pt'.format(i)
+    torch.save({
+        'H': distorted.shape[0],
+        'W': distorted.shape[1],
+        'c2w': camera_in_drb,
+        'intrinsics': torch.FloatTensor(
+            [camera_matrix[0][0], camera_matrix[1][1], camera_matrix[0][2], camera_matrix[1][2]])
+    }, split_dir / 'metadata' / metadata_name)
 
-            metadata_name = '{0:06d}.pt'.format(i)
-            torch.save({
-                'H': distorted.shape[0],
-                'W': distorted.shape[1],
-                'c2w': camera_in_drb,
-                # 'c2w': torch.cat(
-                #     [camera_in_drb[:, 1:2], -camera_in_drb[:, :1], camera_in_drb[:, 2:4]],
-                #     -1),
-                'intrinsics': torch.FloatTensor(
-                    [camera_matrix[0][0], camera_matrix[1][1], camera_matrix[0][2], camera_matrix[1][2]])
-                #'distortion': torch.FloatTensor(distortion)
-            }, split_dir / 'metadata' / metadata_name)
-
-            f.write('{},{}\n'.format(image.name, metadata_name))
-
-    #torch.save(coordinates, output_path / 'coordinates.pt')
-
+    f.write('{},{}\n'.format(image.name, metadata_name))
 
 if __name__ == '__main__':
     main(_get_opts())
