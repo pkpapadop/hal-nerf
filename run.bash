@@ -15,6 +15,7 @@ initialize_arguments()
     image_name=""
     cfg_dir=""
     poses_dir=""
+    ckpt=""
 }
 
 parse_arguments()
@@ -31,6 +32,9 @@ parse_arguments()
         fi
         if [ "${args[$i]}" == "--poses-dir" ]; then
             poses_dir=${args[$(($i+1))]}
+        fi
+        if [ "${args[$i]}" == "--ckpt" ]; then
+            ckpt=${args[$(($i+1))]}
         fi
     done
 }
@@ -54,6 +58,11 @@ check_arguments()
     fi
     if [ "$poses_dir" == "" ]; then
         echo "Error: poses_dir is not specified. (use --poses-dir)"
+        echo "Exiting."
+        exit
+    fi
+    if [ "$ckpt" == "" ]; then
+        echo "Error: ckpt is not specified. (use --ckpt)"
         echo "Exiting."
         exit
     fi
@@ -90,7 +99,7 @@ docker_run()
     echo "Running docker..."
 
     docker run --gpus all -it \
-        --shm-size=4g \
+        --shm-size=16g \
         --env="DISPLAY=$DISPLAY" \
         --env="QT_X11_NO_MITSHM=1" \
         --volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
@@ -99,6 +108,7 @@ docker_run()
         --net=host \
         --privileged \
         -v $poses_dir:/root/colmap_output \
+        -v $ckpt:/root/weight.ckpt \
         -v $cfg_dir:/root/catkin_ws/src/Loc-NeRF/cfg \
         -v $PWD/src/nerfstudio:/root/catkin_ws/src/Loc-NeRF/src/nerfstudio \
         -v $PWD/src/loc_nerf/full_filter.py:/root/catkin_ws/src/Loc-NeRF/src/full_filter.py \
@@ -110,6 +120,7 @@ docker_run()
         -v $PWD/src/run_posenet.py:/root/catkin_ws/src/Loc-NeRF/src/run_posenet.py \
         -v $PWD/src/nerfacto_loader_2.py:/root/catkin_ws/src/Loc-NeRF/src/nerfacto_loader_2.py \
         -v $PWD/src/config_dfnet.txt:/root/catkin_ws/src/Loc-NeRF/src/config_dfnet.txt \
+        -v $PWD/src/colmap_to_mega_nerf.py:/root/catkin_ws/src/Loc-NeRF/src/colmap_to_mega_nerf.py \
         --name $container_name \
         $image_name \
         bash
