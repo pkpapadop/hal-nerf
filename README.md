@@ -8,13 +8,14 @@ This pipeline contains two parts:
 
 ## Prerequisites
 
-Install docker daemon. Install the Nvidia Docker toolkit.
+Install docker daemon. Install Nvidia Docker toolkit.
  
 When building your Docker image and installing the Tiny CUDA Neural Networks (tiny-cuda-nn) library, you need to set the TCNN_CUDA_ARCHITECTURES environment variable to match the CUDA architecture of your GPU. "RUN TCNN_CUDA_ARCHITECTURES=86 pip3 install git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch " 
 
 ## Usage 
 Colmap should be like this:
 
+```
 colmap
 ├── images
 ├── images_2
@@ -25,7 +26,7 @@ colmap
         ├── images.txt
         ├── cameras.txt
         └── points3D.txt
-
+```
 
 1) Go to the following directory: 
 ```bash
@@ -33,6 +34,7 @@ colmap
 ```
 2) Create a folder named "colmap_output" with this structure:
 
+```
 colmap_output
 ├── colmap
 │   ├── images
@@ -48,6 +50,7 @@ colmap_output
 ├── images_2
 ├── images_4
 └── images_8
+```
 
 3) Rename the folder that contains the pre-trained nerfacto model as "model" and move it inside the following directory:
 
@@ -59,7 +62,7 @@ In config.yml file of the model, you have to change the 'output_dir' as /root/co
 4) Compose the image with this command:
 
 ```bash
-docker build -t your_image_name .
+docker build -t <your_image_name> .
 ```
 
 5) Change bash file permission with this command:
@@ -87,7 +90,7 @@ In line 386 you can declare which images you want to use as testing samples
 python run_posenet.py --config config_dfnet.txt
 ```
 
-with config_dfnet.txt you can control some of the pose regressor network training parameters. Especially, with 'random_view_synthesis=True' you can augment your training dataset using pretrained nerfacto model. 'rvs_refresh_rate', 'rvs_trans' and 'rvs_rotation' are the parameters that control how many epochs the dataset will be augmented, the uniform distribution for translation component perturbation and the uniform distribution for rotation component perturbation accordingly.
+with config_dfnet.txt you can control some of the pose regressor network training parameters. Especially, with 'random_view_synthesis=True' you can augment your training dataset using pre-trained nerfacto model. 'rvs_refresh_rate', 'rvs_trans', and 'rvs_rotation' are the parameters that control how many epochs the dataset will be augmented, the uniform distribution for translation component perturbation and the uniform distribution for rotation component perturbation accordingly.
 
 
 
@@ -102,12 +105,12 @@ roslaunch locnerf navigate.launch parameter_file:=<param_file.yaml>
   2) rotation_error_threshold 
   3) termination_mode    #  0: use position_error_threshold, 1: use rotation_error_threshold, 2: use position_error_threshold and rotation_error_threshold
   4) output_path    # the path in which the results will be saved inside the container.
-  5) export_images    # If true, the experiment results contain also visual information.
+  5) export_images    # If true, the experiment results also contain visual information.
   6) particles_random_initial_position around DFNet pose prediction    # initalization of particles' position
   7) particles_random_initial_rotation around DFNet psoe prediction    # initialization of particles' rotation
   8) image_idx    # the ground truth image. We tried to find the pose of the camera when this image was taken. It is used only for visualization purposes to compare it with the predicted result.
 
-10) If you want to visualize the experiment, you can activate rviz visualization. In another terminal, access the running container with this command:
+10) If you want to visualize the experiment, activate rviz visualization. In another terminal, access the running container with this command:
 
 ```bash
 docker exec -it your_container_name /bin/bash
