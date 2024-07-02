@@ -4,56 +4,94 @@ Dockerized High Accuracy Localization application based on Loc-NeRF (https://arx
 
 This pipeline contains two parts:  
  * Training the DFNet pose regressor (https://arxiv.org/abs/2204.00559)
- * Optimizing the prediction of the pose regressor with Loc-NeRF 
+ * Optimizing the prediction of the pose regressor with Loc-NeRF
+
+## Prerequisites
+
+Install docker daemon. Install the Nvidia Docker toolkit.
+ 
+When building your Docker image and installing the Tiny CUDA Neural Networks (tiny-cuda-nn) library, you need to set the TCNN_CUDA_ARCHITECTURES environment variable to match the CUDA architecture of your GPU. "RUN TCNN_CUDA_ARCHITECTURES=86 pip3 install git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch " 
 
 ## Usage 
+Colmap should be like this:
 
-1) Rename your colmap output file as "colmap_output" and move it inside the following directory:
+colmap
+├── images
+├── images_2
+├── images_4
+├── images_8
+└── sparse
+    └── 0
+        ├── images.txt
+        ├── cameras.txt
+        └── points3D.txt
 
+
+1) Go to the following directory: 
 ```bash
 ../hal_nerf/workspace
 ```
+2) Create a folder named "colmap_output" with this structure:
 
-2) Rename the folder that contains the pre-trained nerfacto model as "model" and move it inside the following directory:
+colmap_output
+├── colmap
+│   ├── images
+│   ├── images_2
+│   ├── images_4
+│   ├── images_8
+│   └── sparse
+│       └── 0
+│           ├── images.txt
+│           ├── cameras.txt
+│           └── points3D.txt
+├── images
+├── images_2
+├── images_4
+└── images_8
+
+3) Rename the folder that contains the pre-trained nerfacto model as "model" and move it inside the following directory:
 
 ```bash
 ../hal_nerf/workspace/colmap_output
 ```
-In config.yml file that nerfacto creates, you have to change the 'output_dir' as /root/colmap_output and the 'data' as /root/colmap_output 
+In config.yml file of the model, you have to change the 'output_dir' as /root/colmap_output and the 'pipeline->dataparser->data' as /root/colmap_output 
 
-3) Compose the image with this command:
+4) Compose the image with this command:
 
 ```bash
-docker build -t <your_image_name> .
+docker build -t your_image_name .
 ```
 
-4) Change bash file permission with this command:
+5) Change bash file permission with this command:
 
 ```bash
 chmod +x run.bash
 ```
-5) Run bash script (4 arguments):
+6) Run bash script (5 arguments):
 
 ```bash
-./run.bash --container-name <your_container_name> --cfg-dir $PWD/workspace/cfg_experiment --image-name <your_image_name> --poses-dir $PWD/workspace/colmap_output
+./run.bash --container-name <your_container_name> --cfg-dir $PWD/workspace/cfg_experiment --image-name <your_image_name> --poses-dir $PWD/workspace/colmap_output --ckpt $PWD/workspace/weight.ckpt
 ```
 
-6) Now you are inside the container. First, prepare the dataset for DFNet training:
+7) Now you are inside the container. First, prepare the dataset for DFNet training:
 
 ```bash
 python colmap_to_mega_nerf.py --model_path /root/colmap_output/colmap --images_path /root/colmap_output/images --output_path /root/outputiw
 ```
 
-7) Second, train DFNET: 
+In line 386 you can declare which images you want to use as testing samples
+
+8) Second, train DFNET: 
 
 ```bash
 python run_posenet.py --config config_dfnet.txt
 ```
 
-with config_dfnet.txt you can control some of the pose regressor network training parameters. Especially, with 'random_view_synthesis=True' you can augment your training dataset using a pre-trained nerfacto model. 'rvs_refresh_rate', 'rvs_trans', and 'rvs_rotation' are the parameters that control how many epochs the dataset will be augmented, the uniform distribution for translation component perturbation and the uniform distribution for rotation component perturbation accordingly.
+with config_dfnet.txt you can control some of the pose regressor network training parameters. Especially, with 'random_view_synthesis=True' you can augment your training dataset using pretrained nerfacto model. 'rvs_refresh_rate', 'rvs_trans' and 'rvs_rotation' are the parameters that control how many epochs the dataset will be augmented, the uniform distribution for translation component perturbation and the uniform distribution for rotation component perturbation accordingly.
 
 
-8) Now, you can run HAL-NeRF by running this command:
+
+9) Now, you can run HAL-NeRF by running this command:
 
 ```bash
 roslaunch locnerf navigate.launch parameter_file:=<param_file.yaml>
@@ -64,18 +102,18 @@ roslaunch locnerf navigate.launch parameter_file:=<param_file.yaml>
   2) rotation_error_threshold 
   3) termination_mode    #  0: use position_error_threshold, 1: use rotation_error_threshold, 2: use position_error_threshold and rotation_error_threshold
   4) output_path    # the path in which the results will be saved inside the container.
-  5) export_images    # If true, the experiment results also contain visual information.
+  5) export_images    # If true, the experiment results contain also visual information.
   6) particles_random_initial_position around DFNet pose prediction    # initalization of particles' position
   7) particles_random_initial_rotation around DFNet psoe prediction    # initialization of particles' rotation
   8) image_idx    # the ground truth image. We tried to find the pose of the camera when this image was taken. It is used only for visualization purposes to compare it with the predicted result.
 
-9) If you want to visualize the experiment, activate rviz visualization. In another terminal, access the running container with this command:
+10) If you want to visualize the experiment, you can activate rviz visualization. In another terminal, access the running container with this command:
 
 ```bash
 docker exec -it your_container_name /bin/bash
 ```
 
-10) Once you are inside the container, run:
+11) Once you are inside the container, run:
 
 ```bash
 rviz -d $(rospack find locnerf)/rviz/rviz.rviz 
