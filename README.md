@@ -82,7 +82,11 @@ chmod +x run.bash
 python colmap_to_mega_nerf.py --model_path /root/colmap_output/colmap --images_path /root/colmap_output/images --output_path /root/outputiw
 ```
 
-In line 386 you can declare which images you want to use as testing samples
+In line 386 of colmap_to_mega_nerf.py, you can declare which images you want to use as testing samples
+
+Using the --images_path parameter, you can specify the scale of the images you want to use
+
+
 
 8) Second, train DFNET: 
 
@@ -90,7 +94,7 @@ In line 386 you can declare which images you want to use as testing samples
 python run_posenet.py --config config_dfnet.txt
 ```
 
-with config_dfnet.txt you can control some of the pose regressor network training parameters. Especially, with 'random_view_synthesis=True' you can augment your training dataset using pre-trained nerfacto model. 'rvs_refresh_rate', 'rvs_trans', and 'rvs_rotation' are the parameters that control how many epochs the dataset will be augmented, the uniform distribution for translation component perturbation and the uniform distribution for rotation component perturbation accordingly.
+In the config_dfnet.txt configuration file, you can control various pose regressor network training parameters. Notably, setting random_view_synthesis=True enables augmentation of your training dataset using a pre-trained nerfacto model. The parameter rvs_refresh_rate determines the number of epochs after which the dataset will be augmented. Additionally, rvs_trans specifies the uniform distribution range for translation component perturbations, while rvs_rotation specifies the range for rotation component perturbations. These settings allow for dynamic augmentation, enhancing the training process by introducing controlled perturbations at specified intervals
 
 
 
@@ -106,9 +110,10 @@ roslaunch locnerf navigate.launch parameter_file:=<param_file.yaml>
   3) termination_mode    #  0: use position_error_threshold, 1: use rotation_error_threshold, 2: use position_error_threshold and rotation_error_threshold
   4) output_path    # the path in which the results will be saved inside the container.
   5) export_images    # If true, the experiment results also contain visual information.
-  6) particles_random_initial_position around DFNet pose prediction    # initalization of particles' position
-  7) particles_random_initial_rotation around DFNet psoe prediction    # initialization of particles' rotation
-  8) image_idx    # the ground truth image. We tried to find the pose of the camera when this image was taken. It is used only for visualization purposes to compare it with the predicted result.
+  6) particles_random_initial_position    # initalization of particles' position
+  7) particles_random_initial_rotation    # initialization of particles' rotation
+  8) image_idx    # the index of the testing sample
+  9) factor      # The downscale factor used must match the one chosen during the training of the pose regressor
 
 10) If you want to visualize the experiment, activate rviz visualization. In another terminal, access the running container with this command:
 
