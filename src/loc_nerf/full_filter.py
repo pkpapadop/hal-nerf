@@ -76,8 +76,8 @@ class NeRF:
             checkpoint_path = '/root/weight.ckpt'
             checkpoint_path_2 = '/root/catkin_ws/src/Loc-NeRF/src/pose_regressor/logs/checkpoint.pt'
             transform_path = '/root/colmap_output'
-            image_folder = '/root/outputiw/test/rgbs'
-            pose_folder = '/root/outputiw/test/metadata'
+            image_folder = '/root/test/rgbs'
+            pose_folder = '/root/test/metadata'
 
             #self.obs_img, self.obs_img_pose, self.W, self.H, self.image_filename = input_dataset(transform_path, self.obs_img_num, self.factor)
             self.obs_img_all, self.obs_img_pose_all = upload_files(image_folder, pose_folder)
