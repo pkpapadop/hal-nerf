@@ -116,6 +116,8 @@ COPY src/nerfstudio /root/catkin_ws/src/Loc-NeRF/src/nerfstudio
 
 COPY src/pose_regressor ./
 
+COPY workspace/test /root/test
+
 COPY src/config_dfnet.txt ./
 
 COPY src/*.py ./
